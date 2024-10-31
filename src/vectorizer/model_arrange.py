@@ -87,4 +87,7 @@ def eval_model(model, dataloader, device):
             sequence_output, _ = model.get_sequence_output(input_ids, segment_ids, input_mask)
             visual_output, _ = model.get_visual_output(image_pair, image_mask)
 
+            visual_output = visual_output / visual_output.norm(dim=-1, keepdim=True)
+            sequence_output = sequence_output / sequence_output.norm(dim=-1, keepdim=True)
+
     return sequence_output.squeeze(), visual_output.squeeze()
