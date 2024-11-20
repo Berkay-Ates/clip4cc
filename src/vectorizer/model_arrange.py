@@ -1,8 +1,11 @@
 import torch
 import os
 import argparse
+
+from vectorizer.data_loader import Clip4CCDataLoader
 from .modeling import CLIP4IDC
 from .file_utils import PYTORCH_PRETRAINED_BERT_CACHE
+from torch.utils.data import DataLoader
 
 
 def assign_model_args(data_path, features_path, init_model):
@@ -37,7 +40,7 @@ def assign_model_args(data_path, features_path, init_model):
         fp16=False,
         fp16_opt_level="O1",
         task_type="retrieval",
-        datatype="spot",
+        datatype="levircc", # dataloader fixed as loading separate images
         coef_lr=1.0,
         use_mil=False,
         sampled_use_mil=False,
@@ -69,6 +72,32 @@ def load_model(args, device, model_file=None):
         model = None
     return model.eval()
 
+def get_text_vec(model,text,device,dummy_img):
+    dataset = Clip4CCDataLoader(bef_img_path=dummy_img,aft_img_path=dummy_img,text_caption=text)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+    sequence_output, visual_output = eval_model(model=model,dataloader=dataloader,device=device)
+    
+    return sequence_output
+
+
+def get_img_pair_vec(model,img1_pth, img2_pth,device):
+    dataset = Clip4CCDataLoader(bef_img_path=img1_pth,aft_img_path=img2_pth,text_caption="")
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+    sequence_output, visual_output = eval_model(model=model,dataloader=dataloader,device=device)
+    
+    return visual_output
+
+def get_single_output(model,img1_pth,img2_pth,text,device):
+
+    dataset = Clip4CCDataLoader(bef_img_path=img1_pth,aft_img_path=img2_pth,text_caption=text)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+    sequence_output, visual_output = eval_model(model=model,dataloader=dataloader,device=device)
+    
+    return sequence_output, visual_output
+
 
 def eval_model(model, dataloader, device):
     if hasattr(model, "module"):
@@ -91,3 +120,4 @@ def eval_model(model, dataloader, device):
             sequence_output = sequence_output / sequence_output.norm(dim=-1, keepdim=True)
 
     return sequence_output.squeeze(), visual_output.squeeze()
+

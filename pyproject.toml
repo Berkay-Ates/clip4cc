@@ -19,7 +19,8 @@ dependencies = [
     "regex",
     "Pillow",
     "scikit-learn",
-    "torchvision"
+    "torchvision",
+    "matplotlib"
   ]
 
 description = "A small example package"
