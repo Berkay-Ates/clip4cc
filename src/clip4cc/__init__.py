@@ -8,8 +8,3 @@ from .model_arrange import (
     get_text_vec,
     load_model,
 )
-from .util_functions import (
-    cosine_similarity,
-    get_device,
-    tsine_dimension_reducer,
-)
