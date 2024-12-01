@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """PyTorch optimization for BERT model."""
+
 import logging
 import math
 
@@ -31,18 +32,22 @@ def warmup_cosine(x, warmup=0.002):
 
 
 def warmup_constant(x, warmup=0.002):
-    """Linearly increases learning rate over `warmup`*`t_total` (as provided
+    """
+    Linearly increases learning rate over `warmup`*`t_total` (as provided
     to BertAdam) training steps.
-    Learning rate is 1. afterwards."""
+    Learning rate is 1. afterwards.
+    """
     if x < warmup:
         return x / warmup
     return 1.0
 
 
 def warmup_linear(x, warmup=0.002):
-    """Specifies a triangular learning rate schedule where peak is reached at
+    """
+    Specifies a triangular learning rate schedule where peak is reached at
     `warmup`*`t_total`-th (as provided to BertAdam) training step.
-    After `t_total`-th training step, learning rate is zero."""
+    After `t_total`-th training step, learning rate is zero.
+    """
     if x < warmup:
         return x / warmup
     return max((x - 1.0) / (warmup - 1.0), 0)
@@ -56,7 +61,8 @@ SCHEDULES = {
 
 
 class BertAdam(Optimizer):
-    """Implements BERT version of Adam algorithm with weight decay fix.
+    """
+    Implements BERT version of Adam algorithm with weight decay fix.
     Params:
         lr: learning rate
         warmup: portion of t_total for the warmup, -1  means no warmup.\
@@ -138,10 +144,13 @@ class BertAdam(Optimizer):
         return lr
 
     def step(self, closure=None):
-        """Performs a single optimization step.
+        """
+        Performs a single optimization step.
+
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
+
         """
         loss = None
         if closure is not None:

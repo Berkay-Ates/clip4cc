@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """PyTorch BERT model."""
+
 import copy
 import json
 import logging
@@ -51,7 +52,9 @@ class PretrainedConfig:
         )
         if os.path.exists(archive_file) is False:
             if pretrained_model_name in cls.pretrained_model_archive_map:
-                archive_file = cls.pretrained_model_archive_map[pretrained_model_name]
+                archive_file = cls.pretrained_model_archive_map[
+                    pretrained_model_name
+                ]
             else:
                 archive_file = pretrained_model_name
 
@@ -64,12 +67,9 @@ class PretrainedConfig:
         except FileNotFoundError:
             if task_config is None or task_config.local_rank == 0:
                 logger.error(
-                    "Model name '{}' was not found in model name list. "
-                    "We assumed '{}' was a path or url but couldn't find any"
-                    "file associated to this path or url.".format(
-                        pretrained_model_name,
-                        archive_file,
-                    ),
+                    f"Model name '{pretrained_model_name}' was not found in model name list. "
+                    f"We assumed '{archive_file}' was a path or url but couldn't find any"
+                    "file associated to this path or url.",
                 )
             return None
         if resolved_archive_file == archive_file:
@@ -78,10 +78,7 @@ class PretrainedConfig:
         else:
             if task_config is None or task_config.local_rank == 0:
                 logger.info(
-                    "loading archive file {} from cache at {}".format(
-                        archive_file,
-                        resolved_archive_file,
-                    ),
+                    f"loading archive file {archive_file} from cache at {resolved_archive_file}",
                 )
         tempdir = None
         if os.path.isdir(resolved_archive_file):
@@ -91,10 +88,7 @@ class PretrainedConfig:
             tempdir = tempfile.mkdtemp()
             if task_config is None or task_config.local_rank == 0:
                 logger.info(
-                    "extracting archive file {} to temp dir {}".format(
-                        resolved_archive_file,
-                        tempdir,
-                    ),
+                    f"extracting archive file {resolved_archive_file} to temp dir {tempdir}",
                 )
             with tarfile.open(resolved_archive_file, "r:gz") as archive:
                 archive.extractall(tempdir)

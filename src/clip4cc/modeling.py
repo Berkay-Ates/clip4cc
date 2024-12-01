@@ -3,18 +3,17 @@ import logging
 import torch
 from torch import nn
 
-from clip4cc.module_clip import CLIP
-from clip4cc.module_clip import convert_weights
+from clip4cc.module_clip import CLIP, convert_weights
 from clip4cc.module_cross import CrossConfig
 from clip4cc.module_decoder import DecoderConfig
-from clip4cc.until_module import CrossEn
-from clip4cc.until_module import PreTrainedModel
+from clip4cc.until_module import CrossEn, PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
 
 class CLIP4IDCPreTrainedModel(PreTrainedModel, nn.Module):
-    """An abstract class to handle weights initialization and
+    """
+    An abstract class to handle weights initialization and
     a simple interface for dowloading and loading pretrained models.
     """
 
@@ -148,7 +147,10 @@ def update_attr(
     default_value=None,
 ):
     if hasattr(source_config, source_attr_name):
-        if default_value is None or getattr(source_config, source_attr_name) != default_value:
+        if (
+            default_value is None
+            or getattr(source_config, source_attr_name) != default_value
+        ):
             setattr(
                 target_config,
                 target_attr_name,
@@ -156,13 +158,16 @@ def update_attr(
             )
             show_log(
                 source_config,
-                f"Set {target_name}.{target_attr_name}: " f"{getattr(target_config, target_attr_name)}.",
+                f"Set {target_name}.{target_attr_name}: "
+                f"{getattr(target_config, target_attr_name)}.",
             )
     return target_config
 
 
 def check_attr(target_name, task_config):
-    return hasattr(task_config, target_name) and task_config.__dict__[target_name]
+    return (
+        hasattr(task_config, target_name) and task_config.__dict__[target_name]
+    )
 
 
 class CLIP4IDC(CLIP4IDCPreTrainedModel):
@@ -204,27 +209,52 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
         if vit:
             vision_width = clip_state_dict["visual.conv1.weight"].shape[0]
             vision_layers = len(
-                [k for k in clip_state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")],
+                [
+                    k
+                    for k in clip_state_dict.keys()
+                    if k.startswith("visual.")
+                    and k.endswith(".attn.in_proj_weight")
+                ],
             )
-            vision_patch_size = clip_state_dict["visual.conv1.weight"].shape[-1]
+            vision_patch_size = clip_state_dict["visual.conv1.weight"].shape[
+                -1
+            ]
             grid_size = round(
-                (clip_state_dict["visual.positional_embedding"].shape[0] - 1) ** 0.5,
+                (clip_state_dict["visual.positional_embedding"].shape[0] - 1)
+                ** 0.5,
             )
             image_resolution = vision_patch_size * grid_size
         else:
             counts: list = [
                 len(
-                    {k.split(".")[2] for k in clip_state_dict if k.startswith(f"visual.layer{b}")},
+                    {
+                        k.split(".")[2]
+                        for k in clip_state_dict
+                        if k.startswith(f"visual.layer{b}")
+                    },
                 )
                 for b in [1, 2, 3, 4]
             ]
             vision_layers = tuple(counts)
-            vision_width = clip_state_dict["visual.layer1.0.conv1.weight"].shape[0]
+            vision_width = clip_state_dict[
+                "visual.layer1.0.conv1.weight"
+            ].shape[0]
             output_width = round(
-                (clip_state_dict["visual.attnpool.positional_embedding"].shape[0] - 1) ** 0.5,
+                (
+                    clip_state_dict[
+                        "visual.attnpool.positional_embedding"
+                    ].shape[0]
+                    - 1
+                )
+                ** 0.5,
             )
             vision_patch_size = None
-            assert output_width**2 + 1 == clip_state_dict["visual.attnpool.positional_embedding"].shape[0]
+            assert (
+                output_width**2 + 1
+                == clip_state_dict[
+                    "visual.attnpool.positional_embedding"
+                ].shape[0]
+            )
             image_resolution = output_width * 32
 
         embed_dim = clip_state_dict["text_projection"].shape[1]
@@ -233,7 +263,11 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
         transformer_width = clip_state_dict["ln_final.weight"].shape[0]
         transformer_heads = transformer_width // 64
         transformer_layers = len(
-            {k.split(".")[2] for k in clip_state_dict if k.startswith("transformer.resblocks")},
+            {
+                k.split(".")[2]
+                for k in clip_state_dict
+                if k.startswith("transformer.resblocks")
+            },
         )
 
         show_log(task_config, f"\t embed_dim: {embed_dim}")
@@ -338,14 +372,16 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
 
         # resim ve text karsiliklari tek bir vektorle temsil edildikleri
         # layerdan geciriliyor
-        sequence_emb, visual_emb, sequence_output, visual_output = self.get_sequence_visual_output(
-            input_ids,
-            token_type_ids,
-            attention_mask,
-            image,
-            image_mask,
-            shaped=True,
-            video_frame=pair,
+        sequence_emb, visual_emb, sequence_output, visual_output = (
+            self.get_sequence_visual_output(
+                input_ids,
+                token_type_ids,
+                attention_mask,
+                image,
+                image_mask,
+                shaped=True,
+                video_frame=pair,
+            )
         )
 
         if self.training:

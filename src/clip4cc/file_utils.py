@@ -4,6 +4,7 @@ This file is adapted from the AllenNLP library
 at https://github.com/allenai/allennlp
 Copyright by the AllenNLP authors.
 """
+
 import json
 import logging
 import os
@@ -194,10 +195,7 @@ def get_from_cache(url: str, cache_dir: str | Path = None) -> str:
         response = requests.head(url, allow_redirects=True)
         if response.status_code != 200:
             raise OSError(
-                "HEAD request failed for url {} with status code {}".format(
-                    url,
-                    response.status_code,
-                ),
+                f"HEAD request failed for url {url} with status code {response.status_code}",
             )
         etag = response.headers.get("ETag")
 

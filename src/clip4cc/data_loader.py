@@ -1,14 +1,8 @@
-import json
-import os
-from typing import Any
-from typing import Literal
-from clip4cc.tokenization_clip import SimpleTokenizer as ClipTokenizer
-
-
 import numpy as np
 from torch.utils.data import Dataset
 
 from clip4cc.rawimage_util import RawImageExtractor
+from clip4cc.tokenization_clip import SimpleTokenizer as ClipTokenizer
 
 
 def _extract_raw_sentences(sentence: str) -> list[str]:
@@ -22,7 +16,13 @@ class Clip4CCDataLoader(Dataset):
     max_words = 77
     image_resolution = 224
 
-    def __init__(self, bef_img_path, aft_img_path, text_caption, tokenizer=ClipTokenizer()):
+    def __init__(
+        self,
+        bef_img_path,
+        aft_img_path,
+        text_caption,
+        tokenizer=ClipTokenizer(),
+    ):
         self.tokenizer = tokenizer
 
         self.bef_img_path = bef_img_path
@@ -97,7 +97,9 @@ class Clip4CCDataLoader(Dataset):
         bef_image_path = self.bef_img_path
         aft_image_path = self.aft_img_path
 
-        pairs_text, pairs_mask, pairs_segment = self._get_text(self.raw_sentence)
+        pairs_text, pairs_mask, pairs_segment = self._get_text(
+            self.raw_sentence
+        )
         bef_image = self._get_rawimage(bef_image_path)
         aft_image = self._get_rawimage(aft_image_path)
         image_mask = np.ones(2, dtype=np.int64)

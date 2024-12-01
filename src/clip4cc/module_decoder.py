@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """PyTorch BERT model."""
+
 import copy
 import json
 import logging
@@ -23,9 +24,7 @@ import torch
 from torch import nn
 
 from .until_config import PretrainedConfig
-from .until_module import ACT2FN
-from .until_module import LayerNorm
-from .until_module import PreTrainedModel
+from .until_module import ACT2FN, LayerNorm, PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,8 @@ class DecoderConfig(PretrainedConfig):
         max_target_embeddings=128,
         num_decoder_layers=1,
     ):
-        """Constructs DecoderConfig.
+        """
+        Constructs DecoderConfig.
 
         Args:
             vocab_size_or_config_json_file: Vocabulary size of `inputs_ids` in\
@@ -83,6 +83,7 @@ class DecoderConfig(PretrainedConfig):
                 might ever be used with. Typically set this to something large\
                 just in case (e.g., 512 or 1024 or 2048).
             num_decoder_layers:
+
         """
         if isinstance(vocab_size_or_config_json_file, str):
             with open(
@@ -131,7 +132,9 @@ class BertIntermediate(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.intermediate_act_fn = (
-            ACT2FN[config.hidden_act] if isinstance(config.hidden_act, str) else config.hidden_act
+            ACT2FN[config.hidden_act]
+            if isinstance(config.hidden_act, str)
+            else config.hidden_act
         )
 
     def forward(self, hidden_states):
@@ -158,7 +161,11 @@ class BertPredictionHeadTransform(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.transform_act_fn = ACT2FN[config.hidden_act] if isinstance(config.hidden_act, str) else config.hidden_act
+        self.transform_act_fn = (
+            ACT2FN[config.hidden_act]
+            if isinstance(config.hidden_act, str)
+            else config.hidden_act
+        )
         self.LayerNorm = LayerNorm(config.hidden_size, eps=1e-12)
 
     def forward(self, hidden_states):
@@ -225,7 +232,9 @@ class MultiHeadAttention(nn.Module):
         self.attention_head_size = int(
             config.hidden_size / config.num_attention_heads,
         )
-        self.all_head_size = self.num_attention_heads * self.attention_head_size
+        self.all_head_size = (
+            self.num_attention_heads * self.attention_head_size
+        )
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
@@ -272,7 +281,9 @@ class MultiHeadAttention(nn.Module):
 
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[:-2] + (
+            self.all_head_size,
+        )
         context_layer = context_layer.view(*new_context_layer_shape)
 
         return context_layer, attention_scores
@@ -500,6 +511,7 @@ class DecoderModel(PreTrainedModel):
         args (argparse.Namespace): parsed command-line arguments
         final_norm (bool, optional): apply layer norm to the output of the
             final decoder layer (default: True).
+
     """
 
     def __init__(
@@ -544,14 +556,13 @@ class DecoderModel(PreTrainedModel):
                     `(batch, tgt_len, vocab)`
                 - the last decoder layer's attention weights of shape\
                     `(batch, tgt_len, src_len)`
+
         """
         embedding_output = self.embeddings(input_ids)
 
         extended_encoder_mask = encoder_mask.unsqueeze(
             1,
-        ).unsqueeze(
-            2
-        )  # b x 1 x 1 x ls
+        ).unsqueeze(2)  # b x 1 x 1 x ls
         extended_encoder_mask = extended_encoder_mask.to(
             dtype=self.dtype,
         )  # fp16 compatibility
@@ -580,7 +591,11 @@ class DecoderModel(PreTrainedModel):
             )
             .unsqueeze(1)
         )  # b x 1 x ls x ls
-        slf_attn_mask = ((1.0 - extended_answer_mask) + self_attn_mask).gt(0).to(dtype=self.dtype)
+        slf_attn_mask = (
+            ((1.0 - extended_answer_mask) + self_attn_mask)
+            .gt(0)
+            .to(dtype=self.dtype)
+        )
         self_attn_mask = slf_attn_mask * -10000.0
 
         encoder_outs, _ = self.encoder(

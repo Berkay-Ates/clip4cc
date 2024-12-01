@@ -13,7 +13,6 @@ import torch.nn.functional as F
 from torch import nn
 from tqdm import tqdm
 
-
 _MODELS = {
     "RN50": "https://openaipublic.azureedge.net/clip/models/afeb0e10f9e5a86da6080e35cf09123aca3b358a0c3e3b6c78a7b63bc04b6762/RN50.pt",  # noqa: E501
     "RN101": "https://openaipublic.azureedge.net/clip/models/8fa8567bab74a42d41c5915025a8e4538c3bdbe8804a470a72f30b0d94fab599/RN101.pt",  # noqa: E501
@@ -45,17 +44,24 @@ def _download(url: str, root: str = os.path.expanduser("~/.cache/clip")):
         )
 
     if os.path.isfile(download_target):
-        if hashlib.sha256(open(download_target, "rb").read()).hexdigest() == expected_sha256:
+        if (
+            hashlib.sha256(open(download_target, "rb").read()).hexdigest()
+            == expected_sha256
+        ):
             return download_target
         else:
             warnings.warn(
-                f"{download_target} exists, but the SHA256 checksum does not " "match; re-downloading the file",
+                f"{download_target} exists, but the SHA256 checksum does not "
+                "match; re-downloading the file",
             )
 
-    with urllib.request.urlopen(url) as source, open(
-        download_target,
-        "wb",
-    ) as output:
+    with (
+        urllib.request.urlopen(url) as source,
+        open(
+            download_target,
+            "wb",
+        ) as output,
+    ):
         with tqdm(
             total=int(source.info().get("Content-Length")),
             ncols=80,
@@ -70,9 +76,13 @@ def _download(url: str, root: str = os.path.expanduser("~/.cache/clip")):
                 output.write(buffer)
                 loop.update(len(buffer))
 
-    if hashlib.sha256(open(download_target, "rb").read()).hexdigest() != expected_sha256:
+    if (
+        hashlib.sha256(open(download_target, "rb").read()).hexdigest()
+        != expected_sha256
+    ):
         raise RuntimeError(
-            "Model has been downloaded but the SHA256 " "checksum does not not match",
+            "Model has been downloaded but the SHA256 "
+            "checksum does not not match",
         )
 
     return download_target
@@ -253,7 +263,9 @@ class ModifiedResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
         # residual layers
-        self._inplanes = width  # this is a *mutable* variable used during construction
+        self._inplanes = (
+            width  # this is a *mutable* variable used during construction
+        )
         self.layer1 = self._make_layer(width, layers[0])
         self.layer2 = self._make_layer(width * 2, layers[1], stride=2)
         self.layer3 = self._make_layer(width * 4, layers[2], stride=2)
@@ -332,10 +344,14 @@ class ResidualAttentionBlock(nn.Module):
 
     def attention(self, x: torch.Tensor):
         attn_mask_ = self.attn_mask
-        if self.attn_mask is not None and hasattr(self.attn_mask, "__call__"):
+        if self.attn_mask is not None and callable(self.attn_mask):
             attn_mask_ = self.attn_mask(x.size(0))  # LND
 
-        attn_mask_ = attn_mask_.to(dtype=x.dtype, device=x.device) if attn_mask_ is not None else None
+        attn_mask_ = (
+            attn_mask_.to(dtype=x.dtype, device=x.device)
+            if attn_mask_ is not None
+            else None
+        )
         return self.attn(x, x, x, need_weights=False, attn_mask=attn_mask_)[0]
 
     def forward(self, x_tuple: tuple):
@@ -368,7 +384,10 @@ class Transformer(nn.Module):
         self.width = width
         self.layers = layers
         self.resblocks = nn.Sequential(
-            *[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)],
+            *[
+                ResidualAttentionBlock(width, heads, attn_mask)
+                for _ in range(layers)
+            ],
         )
 
     def forward(self, x: torch.Tensor, video_frame=-1):
@@ -403,7 +422,8 @@ class VisualTransformer(nn.Module):
         scale = width**-0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
         self.positional_embedding = nn.Parameter(
-            scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width),
+            scale
+            * torch.randn((input_resolution // patch_size) ** 2 + 1, width),
         )
         self.ln_pre = LayerNorm(width)
 
@@ -466,7 +486,9 @@ class VisualTransformer(nn.Module):
         x = torch.cat(
             [
                 self.class_embedding.to(x.dtype)
-                + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
+                + torch.zeros(
+                    x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device
+                ),
                 x,
             ],
             dim=1,
@@ -480,7 +502,9 @@ class VisualTransformer(nn.Module):
         if visualize is True:
             all_attn_weights = []
             for i in range(self.intra_layers):
-                x, _, attn_weights = self.transformer.resblocks[i].visualize_forward((x, video_frame))
+                x, _, attn_weights = self.transformer.resblocks[
+                    i
+                ].visualize_forward((x, video_frame))
                 attn_weights = attn_weights.view(
                     x.size(1) // video_frame,
                     -1,
@@ -510,7 +534,9 @@ class VisualTransformer(nn.Module):
 
         if visualize is True:
             for i in range(self.intra_layers, self.transformer.layers):
-                x, _, attn_weights = self.transformer.resblocks[i].visualize_forward((x, video_frame))
+                x, _, attn_weights = self.transformer.resblocks[
+                    i
+                ].visualize_forward((x, video_frame))
                 all_attn_weights.append(attn_weights)
         else:
             for i in range(self.intra_layers, self.transformer.layers):
@@ -606,7 +632,9 @@ class CLIP(nn.Module):
                     if name.endswith("bn3.weight"):
                         nn.init.zeros_(param)
 
-        proj_std = (self.transformer.width**-0.5) * ((2 * self.transformer.layers) ** -0.5)
+        proj_std = (self.transformer.width**-0.5) * (
+            (2 * self.transformer.layers) ** -0.5
+        )
         attn_std = self.transformer.width**-0.5
         fc_std = (2 * self.transformer.width) ** -0.5
         for block in self.transformer.resblocks:
@@ -627,7 +655,10 @@ class CLIP(nn.Module):
             os.path.dirname(os.path.abspath(__file__)),
             "ViT-B-32.pt",
         )
-        if pretrained_clip_name in _MODELS and pretrained_clip_name in _PT_NAME:
+        if (
+            pretrained_clip_name in _MODELS
+            and pretrained_clip_name in _PT_NAME
+        ):
             model_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
                 _PT_NAME[pretrained_clip_name],
@@ -644,7 +675,8 @@ class CLIP(nn.Module):
                 model_path = pretrained_clip_name
             else:
                 raise RuntimeError(
-                    f"Model {pretrained_clip_name} not found; " f"available models = {available_models()}",
+                    f"Model {pretrained_clip_name} not found; "
+                    f"available models = {available_models()}",
                 )
 
         try:
@@ -768,7 +800,12 @@ def build_model(state_dict: dict):
     if vit:
         vision_width = state_dict["visual.conv1.weight"].shape[0]
         vision_layers = len(
-            [k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")],
+            [
+                k
+                for k in state_dict.keys()
+                if k.startswith("visual.")
+                and k.endswith(".attn.in_proj_weight")
+            ],
         )
         vision_patch_size = state_dict["visual.conv1.weight"].shape[-1]
         grid_size = round(
@@ -778,17 +815,25 @@ def build_model(state_dict: dict):
     else:
         counts: list = [
             len(
-                {k.split(".")[2] for k in state_dict if k.startswith(f"visual.layer{b}")},
+                {
+                    k.split(".")[2]
+                    for k in state_dict
+                    if k.startswith(f"visual.layer{b}")
+                },
             )
             for b in [1, 2, 3, 4]
         ]
         vision_layers = tuple(counts)
         vision_width = state_dict["visual.layer1.0.conv1.weight"].shape[0]
         output_width = round(
-            (state_dict["visual.attnpool.positional_embedding"].shape[0] - 1) ** 0.5,
+            (state_dict["visual.attnpool.positional_embedding"].shape[0] - 1)
+            ** 0.5,
         )
         vision_patch_size = None
-        assert output_width**2 + 1 == state_dict["visual.attnpool.positional_embedding"].shape[0]
+        assert (
+            output_width**2 + 1
+            == state_dict["visual.attnpool.positional_embedding"].shape[0]
+        )
         image_resolution = output_width * 32
 
     embed_dim = state_dict["text_projection"].shape[1]
@@ -797,7 +842,11 @@ def build_model(state_dict: dict):
     transformer_width = state_dict["ln_final.weight"].shape[0]
     transformer_heads = transformer_width // 64
     transformer_layers = len(
-        {k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks")},
+        {
+            k.split(".")[2]
+            for k in state_dict
+            if k.startswith("transformer.resblocks")
+        },
     )
 
     model = CLIP(

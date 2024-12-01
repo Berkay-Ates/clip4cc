@@ -1,11 +1,13 @@
-import torch
-import os
 import argparse
+import os
+
+import torch
+from torch.utils.data import DataLoader
 
 from clip4cc.data_loader import Clip4CCDataLoader
-from .modeling import CLIP4IDC
+
 from .file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from torch.utils.data import DataLoader
+from .modeling import CLIP4IDC
 
 
 def assign_model_args(data_path, features_path, init_model):
@@ -40,7 +42,7 @@ def assign_model_args(data_path, features_path, init_model):
         fp16=False,
         fp16_opt_level="O1",
         task_type="retrieval",
-        datatype="levircc", # dataloader fixed as loading separate images
+        datatype="levircc",  # dataloader fixed as loading separate images
         coef_lr=1.0,
         use_mil=False,
         sampled_use_mil=False,
@@ -61,10 +63,18 @@ def load_model(args, device, model_file=None):
         print("Model loaded from %s", model_file)
         # Prepare model
         cache_dir = (
-            args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), "distributed")
+            args.cache_dir
+            if args.cache_dir
+            else os.path.join(
+                str(PYTORCH_PRETRAINED_BERT_CACHE), "distributed"
+            )
         )
         model = CLIP4IDC.from_pretrained(
-            args.cross_model, args.decoder_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args
+            args.cross_model,
+            args.decoder_model,
+            cache_dir=cache_dir,
+            state_dict=model_state_dict,
+            task_config=args,
         )
 
         model.to(device)
@@ -72,30 +82,43 @@ def load_model(args, device, model_file=None):
         model = None
     return model.eval()
 
-def get_text_vec(model,text,device,dummy_img):
-    dataset = Clip4CCDataLoader(bef_img_path=dummy_img,aft_img_path=dummy_img,text_caption=text)
+
+def get_text_vec(model, text, device, dummy_img):
+    dataset = Clip4CCDataLoader(
+        bef_img_path=dummy_img, aft_img_path=dummy_img, text_caption=text
+    )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    sequence_output, visual_output = eval_model(model=model,dataloader=dataloader,device=device)
-    
+    sequence_output, visual_output = eval_model(
+        model=model, dataloader=dataloader, device=device
+    )
+
     return sequence_output
 
 
-def get_img_pair_vec(model,img1_pth, img2_pth,device):
-    dataset = Clip4CCDataLoader(bef_img_path=img1_pth,aft_img_path=img2_pth,text_caption="")
+def get_img_pair_vec(model, img1_pth, img2_pth, device):
+    dataset = Clip4CCDataLoader(
+        bef_img_path=img1_pth, aft_img_path=img2_pth, text_caption=""
+    )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    sequence_output, visual_output = eval_model(model=model,dataloader=dataloader,device=device)
-    
+    sequence_output, visual_output = eval_model(
+        model=model, dataloader=dataloader, device=device
+    )
+
     return visual_output
 
-def get_single_output(model,img1_pth,img2_pth,text,device):
 
-    dataset = Clip4CCDataLoader(bef_img_path=img1_pth,aft_img_path=img2_pth,text_caption=text)
+def get_single_output(model, img1_pth, img2_pth, text, device):
+    dataset = Clip4CCDataLoader(
+        bef_img_path=img1_pth, aft_img_path=img2_pth, text_caption=text
+    )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    sequence_output, visual_output = eval_model(model=model,dataloader=dataloader,device=device)
-    
+    sequence_output, visual_output = eval_model(
+        model=model, dataloader=dataloader, device=device
+    )
+
     return sequence_output, visual_output
 
 
@@ -106,18 +129,29 @@ def eval_model(model, dataloader, device):
         model = model.to(device)
 
     with torch.no_grad():
-
         for bid, batch in enumerate(dataloader):
             batch = tuple(t.to(device) for t in batch)
-            input_ids, input_mask, segment_ids, bef_image, aft_image, image_mask = batch
+            (
+                input_ids,
+                input_mask,
+                segment_ids,
+                bef_image,
+                aft_image,
+                image_mask,
+            ) = batch
             image_pair = torch.cat([bef_image, aft_image], 1)
 
             # Modelden metin ve görüntü çıktılarını al
-            sequence_output, _ = model.get_sequence_output(input_ids, segment_ids, input_mask)
+            sequence_output, _ = model.get_sequence_output(
+                input_ids, segment_ids, input_mask
+            )
             visual_output, _ = model.get_visual_output(image_pair, image_mask)
 
-            visual_output = visual_output / visual_output.norm(dim=-1, keepdim=True)
-            sequence_output = sequence_output / sequence_output.norm(dim=-1, keepdim=True)
+            visual_output = visual_output / visual_output.norm(
+                dim=-1, keepdim=True
+            )
+            sequence_output = sequence_output / sequence_output.norm(
+                dim=-1, keepdim=True
+            )
 
     return sequence_output.squeeze(), visual_output.squeeze()
-

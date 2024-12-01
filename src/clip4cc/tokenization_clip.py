@@ -45,11 +45,12 @@ def bytes_to_unicode():
             cs.append(2**8 + n)
             n += 1
     cs = [chr(n) for n in cs]
-    return dict(zip(bs, cs))
+    return dict(zip(bs, cs, strict=False))
 
 
 def get_pairs(word):
-    """Return set of symbol pairs in a word.
+    """
+    Return set of symbol pairs in a word.
     Word is represented as tuple of symbols
     (symbols being variable-length strings).
     """
@@ -85,9 +86,9 @@ class SimpleTokenizer:
         for merge in merges:
             vocab.append("".join(merge))
         vocab.extend(["<|startoftext|>", "<|endoftext|>"])
-        self.encoder = dict(zip(vocab, range(len(vocab))))
+        self.encoder = dict(zip(vocab, range(len(vocab)), strict=False))
         self.decoder = {v: k for k, v in self.encoder.items()}
-        self.bpe_ranks = dict(zip(merges, range(len(merges))))
+        self.bpe_ranks = dict(zip(merges, range(len(merges)), strict=False))
         self.cache = {
             "<|startoftext|>": "<|startoftext|>",
             "<|endoftext|>": "<|endoftext|>",
@@ -130,7 +131,11 @@ class SimpleTokenizer:
                     new_word.extend(word[i:])
                     break
 
-                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
+                if (
+                    word[i] == first
+                    and i < len(word) - 1
+                    and word[i + 1] == second
+                ):
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -150,8 +155,13 @@ class SimpleTokenizer:
         bpe_tokens = []
         text = whitespace_clean(basic_clean(text)).lower()
         for token in re.findall(self.pat, text):
-            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
-            bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(" "))
+            token = "".join(
+                self.byte_encoder[b] for b in token.encode("utf-8")
+            )
+            bpe_tokens.extend(
+                self.encoder[bpe_token]
+                for bpe_token in self.bpe(token).split(" ")
+            )
         return bpe_tokens
 
     def decode(self, tokens):
@@ -170,8 +180,12 @@ class SimpleTokenizer:
         tokens = []
         text = whitespace_clean(basic_clean(text)).lower()
         for token in re.findall(self.pat, text):
-            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
-            tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
+            token = "".join(
+                self.byte_encoder[b] for b in token.encode("utf-8")
+            )
+            tokens.extend(
+                bpe_token for bpe_token in self.bpe(token).split(" ")
+            )
         return tokens
 
     def convert_tokens_to_ids(self, tokens):

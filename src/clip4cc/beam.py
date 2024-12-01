@@ -5,6 +5,7 @@ For code in OpenNMT-py, please check the following link
 (maybe in oldest version):
 https://github.com/OpenNMT/OpenNMT-py/blob/master/onmt/Beam.py
 """
+
 import torch
 
 
@@ -58,11 +59,11 @@ class Beam:
         ]
 
     def get_current_state(self):
-        "Get the outputs for the current timestep."
+        """Get the outputs for the current timestep."""
         return self.get_tentative_hypothesis()
 
     def get_current_origin(self):
-        "Get the backpointers for the current timestep."
+        """Get the backpointers for the current timestep."""
         return self.prev_ks[-1]
 
     @property
@@ -70,7 +71,7 @@ class Beam:
         return self._done
 
     def advance(self, word_prob, word_length=None):
-        "Update beam status and check if finished or not."
+        """Update beam status and check if finished or not."""
         num_words = word_prob.size(1)
         # Sum the previous scores.
         if len(self.prev_ks) > 0:
@@ -98,17 +99,16 @@ class Beam:
         return self._done
 
     def sort_scores(self):
-        "Sort the scores."
+        """Sort the scores."""
         return torch.sort(self.scores, 0, True)
 
     def get_the_best_score_and_idx(self):
-        "Get the score of the best in the beam."
+        """Get the score of the best in the beam."""
         scores, ids = self.sort_scores()
         return scores[1], ids[1]
 
     def get_tentative_hypothesis(self):
-        "Get the decoded sequence for the current timestep."
-
+        """Get the decoded sequence for the current timestep."""
         if len(self.next_ys) == 1:
             dec_seq = self.next_ys[0].unsqueeze(1)
         else:

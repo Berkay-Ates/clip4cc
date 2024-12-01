@@ -1,9 +1,6 @@
 import numpy as np
 from PIL import Image
-from torchvision.transforms import Compose
-from torchvision.transforms import Normalize
-from torchvision.transforms import Resize
-from torchvision.transforms import ToTensor
+from torchvision.transforms import Compose, Normalize, Resize, ToTensor
 
 # pytorch=1.7.1
 # pip install opencv-python

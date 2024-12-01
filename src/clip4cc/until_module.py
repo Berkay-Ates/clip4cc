@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """PyTorch BERT model."""
+
 import logging
 import math
 
@@ -28,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def gelu(x):
-    """Implementation of the gelu activation function.
+    """
+    Implementation of the gelu activation function.
     For information: OpenAI GPT's gelu is slightly different
     (and gives slightly different results):
     0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 *
@@ -46,8 +48,10 @@ ACT2FN = {"gelu": gelu, "relu": torch.nn.functional.relu, "swish": swish}
 
 class LayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-12):
-        """Construct a layernorm module in the TF style
-        (epsilon inside the square root)."""
+        """
+        Construct a layernorm module in the TF style
+        (epsilon inside the square root).
+        """
         super().__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.bias = nn.Parameter(torch.zeros(hidden_size))
@@ -61,7 +65,8 @@ class LayerNorm(nn.Module):
 
 
 class PreTrainedModel(nn.Module):
-    """An abstract class to handle weights initialization and
+    """
+    An abstract class to handle weights initialization and
     a simple interface for dowloading and loading pretrained models.
     """
 
@@ -69,13 +74,10 @@ class PreTrainedModel(nn.Module):
         super().__init__()
         if not isinstance(config, PretrainedConfig):
             raise ValueError(
-                "Parameter config in `{}(config)` should be an instance of "
+                f"Parameter config in `{self.__class__.__name__}(config)` should be an instance of "
                 "class `PretrainedConfig`. "
                 "To create a model from a Google pretrained model use "
-                "`model = {}.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
-                    self.__class__.__name__,
-                    self.__class__.__name__,
-                ),
+                f"`model = {self.__class__.__name__}.from_pretrained(PRETRAINED_MODEL_NAME)`",
             )
         self.config = config
 
@@ -115,7 +117,7 @@ class PreTrainedModel(nn.Module):
             if new_key:
                 old_keys.append(key)
                 new_keys.append(new_key)
-        for old_key, new_key in zip(old_keys, new_keys):
+        for old_key, new_key in zip(old_keys, new_keys, strict=False):
             state_dict[new_key] = state_dict.pop(old_key)
 
         if prefix is not None:
@@ -124,7 +126,7 @@ class PreTrainedModel(nn.Module):
             for key in state_dict.keys():
                 old_keys.append(key)
                 new_keys.append(prefix + key)
-            for old_key, new_key in zip(old_keys, new_keys):
+            for old_key, new_key in zip(old_keys, new_keys, strict=False):
                 state_dict[new_key] = state_dict.pop(old_key)
 
         missing_keys = []
@@ -160,7 +162,9 @@ class PreTrainedModel(nn.Module):
 
         load(model, prefix="")
 
-        if prefix is None and (task_config is None or task_config.local_rank == 0):
+        if prefix is None and (
+            task_config is None or task_config.local_rank == 0
+        ):
             logger.info("-" * 20)
             if len(missing_keys) > 0:
                 logger.info(
@@ -199,7 +203,11 @@ class PreTrainedModel(nn.Module):
         except StopIteration:
             # For nn.DataParallel compatibility in PyTorch 1.5
             def find_tensor_attributes(module: nn.Module):
-                tuples = [(k, v) for k, v in module.__dict__.items() if torch.is_tensor(v)]
+                tuples = [
+                    (k, v)
+                    for k, v in module.__dict__.items()
+                    if torch.is_tensor(v)
+                ]
                 return tuples
 
             gen = self._named_members(get_members_fn=find_tensor_attributes)
@@ -262,7 +270,9 @@ class MILNCELoss(nn.Module):
         logpt = F.log_softmax(new_sim_matrix, dim=-1)
 
         mm_mask_logpt = torch.cat([mm_mask, torch.zeros_like(mm_mask)], dim=-1)
-        masked_logpt = logpt + (torch.ones_like(mm_mask_logpt) - mm_mask_logpt) * -1e12
+        masked_logpt = (
+            logpt + (torch.ones_like(mm_mask_logpt) - mm_mask_logpt) * -1e12
+        )
 
         new_logpt = -torch.logsumexp(masked_logpt, dim=-1)
 
@@ -294,10 +304,14 @@ class MaxMarginRankingLoss(nn.Module):
         self.easy_negative_rate = easy_negative_rate
         self.negative_weighting = negative_weighting
         if n_pair > 1 and batch_size > 1:
-            alpha = easy_negative_rate / ((batch_size - 1) * (1 - easy_negative_rate))
+            alpha = easy_negative_rate / (
+                (batch_size - 1) * (1 - easy_negative_rate)
+            )
             mm_mask = (1 - alpha) * np.eye(self.batch_size) + alpha
             mm_mask = np.kron(mm_mask, np.ones((n_pair, n_pair)))
-            mm_mask = torch.tensor(mm_mask) * (batch_size * (1 - easy_negative_rate))
+            mm_mask = torch.tensor(mm_mask) * (
+                batch_size * (1 - easy_negative_rate)
+            )
             self.mm_mask = mm_mask.float()
 
     def forward(self, x):
@@ -324,6 +338,8 @@ class AllGather(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         return (
-            grad_output[ctx.batch_size * ctx.rank : ctx.batch_size * (ctx.rank + 1)],
+            grad_output[
+                ctx.batch_size * ctx.rank : ctx.batch_size * (ctx.rank + 1)
+            ],
             None,
         )

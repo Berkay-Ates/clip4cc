@@ -1,6 +1,6 @@
 import numpy as np
-from sklearn.manifold import TSNE
 import torch
+from sklearn.manifold import TSNE
 
 
 def cosine_similarity(vec1, vec2):
@@ -11,7 +11,9 @@ def cosine_similarity(vec1, vec2):
 
 
 def tsine_dimension_reducer(data, n_components=2, learning_rate="auto"):
-    return TSNE(n_components=n_components, learning_rate=learning_rate, init="random").fit_transform(data)
+    return TSNE(
+        n_components=n_components, learning_rate=learning_rate, init="random"
+    ).fit_transform(data)
 
 
 def get_device():

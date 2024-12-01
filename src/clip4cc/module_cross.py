@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """PyTorch BERT model."""
+
 import copy
 import json
 import logging
@@ -23,9 +24,7 @@ import torch
 from torch import nn
 
 from .until_config import PretrainedConfig
-from .until_module import ACT2FN
-from .until_module import LayerNorm
-from .until_module import PreTrainedModel
+from .until_module import ACT2FN, LayerNorm, PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,8 @@ class CrossConfig(PretrainedConfig):
         type_vocab_size=2,
         initializer_range=0.02,
     ):
-        """Constructs CrossConfig.
+        """
+        Constructs CrossConfig.
 
         Args:
             vocab_size_or_config_json_file: Vocabulary size of `inputs_ids` in\
@@ -81,6 +81,7 @@ class CrossConfig(PretrainedConfig):
                 passed into `CrossModel`.
             initializer_range: The sttdev of the truncated_normal_initializer\
                 for initializing all weight matrices.
+
         """
         if isinstance(vocab_size_or_config_json_file, str):
             with open(
@@ -156,7 +157,9 @@ class CrossEmbeddings(nn.Module):
         token_type_embeddings = self.token_type_embeddings(concat_type)
         position_embeddings = self.position_embeddings(position_ids)
 
-        embeddings = concat_embeddings + position_embeddings + token_type_embeddings
+        embeddings = (
+            concat_embeddings + position_embeddings + token_type_embeddings
+        )
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -178,7 +181,9 @@ class CrossSelfAttention(nn.Module):
         self.attention_head_size = int(
             config.hidden_size / config.num_attention_heads,
         )
-        self.all_head_size = self.num_attention_heads * self.attention_head_size
+        self.all_head_size = (
+            self.num_attention_heads * self.attention_head_size
+        )
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
@@ -225,7 +230,9 @@ class CrossSelfAttention(nn.Module):
 
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[:-2] + (
+            self.all_head_size,
+        )
         context_layer = context_layer.view(*new_context_layer_shape)
         return context_layer
 
@@ -261,7 +268,9 @@ class CrossIntermediate(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.intermediate_act_fn = (
-            ACT2FN[config.hidden_act] if isinstance(config.hidden_act, str) else config.hidden_act
+            ACT2FN[config.hidden_act]
+            if isinstance(config.hidden_act, str)
+            else config.hidden_act
         )
 
     def forward(self, hidden_states):
@@ -341,7 +350,11 @@ class CrossPredictionHeadTransform(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.transform_act_fn = ACT2FN[config.hidden_act] if isinstance(config.hidden_act, str) else config.hidden_act
+        self.transform_act_fn = (
+            ACT2FN[config.hidden_act]
+            if isinstance(config.hidden_act, str)
+            else config.hidden_act
+        )
         self.LayerNorm = LayerNorm(config.hidden_size, eps=1e-12)
 
     def forward(self, hidden_states):
