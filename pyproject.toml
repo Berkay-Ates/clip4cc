@@ -1,37 +1,66 @@
+[project]
+name = "clip4cc"
+version = "0.1.0"
+description = "A Python package for vectorizing image pairs and change captioning based on CLIP4IDC."
+readme = "README.md"
+authors = [
+  { name = "Berkay Ates", email = "atesberkay2356@gmail.com" },
+  { name = "orkhank", email = "118054233+orkhank@users.noreply.github.com" },
+]
+requires-python = ">=3.10"
+dependencies = [
+  "boto3>=1.35.71",
+  "ftfy>=6.2.0",
+  "numpy>=1.24.4",
+  "opencv-python>=4.8.1.78",
+  "pandas>=2.0.3",
+  "pycocoevalcap>=1.2",
+  "regex>=2024.11.6",
+  "requests>=2.32.3",
+  "tqdm>=4.67.1",
+]
+
+[project.optional-dependencies]
+cpu = ["torch>=2.5.1", "torchvision>=0.20.1"]
+cu118 = ["torch>=2.5.1", "torchvision>=0.20.1"]
+cu124 = ["torch>=2.5.1", "torchvision>=0.20.1"]
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cu124" }, { extra = "cu118" }]]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu", marker = "platform_system != 'Darwin'" },
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu124", extra = "cu124" },
+]
+torchvision = [
+  { index = "pytorch-cpu", extra = "cpu", marker = "platform_system != 'Darwin'" },
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu124", extra = "cu124" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[project]
-name = "vectorizer"
-version = "0.0.2"
-authors = [
-  { name="Berkay Ates", email="atesberkay2356@gmail.com" },
+[dependency-groups]
+dev = [
+    "mypy>=1.13.0",
 ]
-dependencies = [
-    "numpy",
-    "pandas",
-    "torch",
-    "boto3",
-    "requests",
-    "tqdm",
-    "ftfy",
-    "regex",
-    "Pillow",
-    "scikit-learn",
-    "torchvision",
-    "matplotlib"
-  ]
-
-description = "A small example package"
-readme = "README.md"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
-
-[project.urls]
-Homepage = "https://github.com/pypa/sampleproject"
-Issues = "https://github.com/pypa/sampleproject/issues"
