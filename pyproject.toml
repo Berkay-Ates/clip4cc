@@ -1,6 +1,6 @@
 [project]
 name = "clip4cc"
-version = "0.1.0"
+version = "0.3.0"
 description = "A Python package for vectorizing image pairs and change captioning based on CLIP4IDC."
 readme = "README.md"
 authors = [
