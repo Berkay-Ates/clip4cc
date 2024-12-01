@@ -2,13 +2,13 @@ import json
 import os
 from typing import Any
 from typing import Literal
-from vectorizer.tokenization_clip import SimpleTokenizer as ClipTokenizer
+from clip4cc.tokenization_clip import SimpleTokenizer as ClipTokenizer
 
 
 import numpy as np
 from torch.utils.data import Dataset
 
-from vectorizer.rawimage_util import RawImageExtractor
+from clip4cc.rawimage_util import RawImageExtractor
 
 
 def _extract_raw_sentences(sentence: str) -> list[str]:

@@ -3,12 +3,12 @@ import logging
 import torch
 from torch import nn
 
-from vectorizer.module_clip import CLIP
-from vectorizer.module_clip import convert_weights
-from vectorizer.module_cross import CrossConfig
-from vectorizer.module_decoder import DecoderConfig
-from vectorizer.until_module import CrossEn
-from vectorizer.until_module import PreTrainedModel
+from clip4cc.module_clip import CLIP
+from clip4cc.module_clip import convert_weights
+from clip4cc.module_cross import CrossConfig
+from clip4cc.module_decoder import DecoderConfig
+from clip4cc.until_module import CrossEn
+from clip4cc.until_module import PreTrainedModel
 
 logger = logging.getLogger(__name__)
 

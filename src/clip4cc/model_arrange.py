@@ -2,7 +2,7 @@ import torch
 import os
 import argparse
 
-from vectorizer.data_loader import Clip4CCDataLoader
+from clip4cc.data_loader import Clip4CCDataLoader
 from .modeling import CLIP4IDC
 from .file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from torch.utils.data import DataLoader
