@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class CLIP4IDCPreTrainedModel(PreTrainedModel, nn.Module):
     """
     An abstract class to handle weights initialization and
-    a simple interface for dowloading and loading pretrained models.
+    a simple interface for downloading and loading pretrained models.
     """
 
     def __init__(self, cross_config, decoder_config, *inputs, **kwargs):
@@ -337,7 +337,7 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
 
     def forward(
         self,
-        input_ids,  # kelimelerin vektor formatina cevrilmis halleri
+        input_ids,  # kelimelerin vector formatina cevrilmis halleri
         token_type_ids,  # farkli cumleleri ayirt etmek icin kullanilir
         attention_mask,  # modelin hangi tokelara dikkat etmesini belirtir
         bef_image,
