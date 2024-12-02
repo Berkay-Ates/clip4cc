@@ -30,6 +30,14 @@ For example, if you want to set up the environment with CUDA 11.8 support, you w
 uv sync --extra cu118
 ```
 
+This will create a virtual environment, which you can activate by:
+
+```bash
+source .venv/bin/activate # for linux and mac
+.venv\Scripts\activate # for windows
+```
+
+
 ## Additional Information
 
 - Ensure that your system meets the requirements for the selected PyTorch version.
