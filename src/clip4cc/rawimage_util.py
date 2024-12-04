@@ -34,7 +34,7 @@ class RawImageExtractorCV2:
         image_data = preprocess(image)
 
         return {"image": image_data}
-    
+
     def load_image(self, data):
         # Eğer veri bir PIL Image nesnesiyse
         if isinstance(data, Image.Image):
@@ -47,13 +47,11 @@ class RawImageExtractorCV2:
         else:
             raise ValueError("Geçersiz veri tipi")
 
-
     def get_image_data_path(self, image_path):
         image_input = self.image_to_tensor(image_path, self.transform)
         return image_input
 
-
-    def get_image_data(self,image_loaded):
+    def get_image_data(self, image_loaded):
         image_loaded = image_loaded.convert("RGB")
         image_loaded = self.transform(image_loaded)
 
