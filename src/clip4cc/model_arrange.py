@@ -79,9 +79,7 @@ def load_model(args, device, model_file=None):
 
 
 def get_text_vec(model, text, device, dummy_img):
-    dataset = Clip4CCDataLoader(
-        bef_img_path=dummy_img, aft_img_path=dummy_img, text_caption=text
-    )
+    dataset = Clip4CCDataLoader(text_caption=text)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     sequence_output, visual_output = eval_model(
@@ -92,9 +90,7 @@ def get_text_vec(model, text, device, dummy_img):
 
 
 def get_img_pair_vec(model, img1_pth, img2_pth, device):
-    dataset = Clip4CCDataLoader(
-        bef_img_path=img1_pth, aft_img_path=img2_pth, text_caption=""
-    )
+    dataset = Clip4CCDataLoader(bef_img_path=img1_pth, aft_img_path=img2_pth)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     sequence_output, visual_output = eval_model(
