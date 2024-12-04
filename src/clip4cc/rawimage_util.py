@@ -53,6 +53,13 @@ class RawImageExtractorCV2:
         image_input = self.image_to_tensor(image_path, self.transform)
         return image_input
 
+
+    def get_image_data(self,image_loaded):
+        image_loaded = image_loaded.convert("RGB")
+        image_loaded = self.transform(image_loaded)
+
+        return {"image": image_loaded}
+
     def process_raw_data(self, raw_video_data):
         tensor_size = raw_video_data.size()
         tensor = raw_video_data.view(
