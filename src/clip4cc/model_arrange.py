@@ -88,7 +88,7 @@ def get_text_vec(model, text, device, dummy_img):
         model=model, dataloader=dataloader, device=device
     )
 
-    return sequence_output
+    return sequence_output.squeeze()
 
 
 def get_img_pair_vec(model, img1_pth, img2_pth, device):
@@ -101,7 +101,7 @@ def get_img_pair_vec(model, img1_pth, img2_pth, device):
         model=model, dataloader=dataloader, device=device
     )
 
-    return visual_output
+    return visual_output.squeeze()
 
 
 def get_single_output(model, img1_pth, img2_pth, text, device):
