@@ -84,16 +84,15 @@ def encode_text(
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
-        for bid, batch in enumerate(dataloader):
-            batch = tuple(t.to(device) for t in batch)
-            (input_ids, input_mask, segment_ids) = batch
+        batch = tuple(t.to(device) for t in next(iter(dataloader)))
+        (input_ids, input_mask, segment_ids) = batch
 
-            sequence_output, _ = model.get_sequence_output(
-                input_ids, segment_ids, input_mask
-            )
-            sequence_output = sequence_output / sequence_output.norm(
-                dim=-1, keepdim=True
-            )
+        sequence_output, _ = model.get_sequence_output(
+            input_ids, segment_ids, input_mask
+        )
+        sequence_output = sequence_output / sequence_output.norm(
+            dim=-1, keepdim=True
+        )
 
     return sequence_output.squeeze()
 
