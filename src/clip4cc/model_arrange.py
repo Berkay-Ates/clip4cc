@@ -80,6 +80,8 @@ def load_model(args, device, model_file=None):
         model.to(device)
     else:
         model = None
+        raise FileNotFoundError(f"The path doesn't exists: {model_file}")
+
     return model.eval()
 
 
