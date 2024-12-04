@@ -56,7 +56,8 @@ def get_model_args():
     )
 
 
-def load_model(args, device, model_file=None):
+def load_model(device, model_file=None):
+    args = get_model_args()
     if os.path.exists(model_file):
         model_state_dict = torch.load(model_file, map_location="cpu")
 
