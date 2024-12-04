@@ -113,11 +113,11 @@ def encode_image(
         image_pair = torch.cat([bef_image, aft_image], 1)
 
         visual_output, _ = model.get_visual_output(image_pair, image_mask)
-        visual_output = visual_output / visual_output.norm(
-            dim=-1, keepdim=True
+        normalized_visual_output: torch.Tensor = (
+            visual_output / visual_output.norm(dim=-1, keepdim=True)
         )
 
-    return visual_output.squeeze()
+    return normalized_visual_output.squeeze()
 
 
 def get_single_output(model, img1_pth, img2_pth, text, device):
