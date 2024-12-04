@@ -15,8 +15,8 @@ def assign_model_args(data_path, features_path, init_model):
         do_pretrain=False,
         do_train=False,
         do_eval=True,
-        data_path=data_path,
-        features_path=features_path,
+        data_path="",
+        features_path="",
         num_thread_reader=1,
         lr=0.0001,
         epochs=1,
@@ -34,11 +34,12 @@ def assign_model_args(data_path, features_path, init_model):
         output_dir="output/",
         cross_model="cross-base",
         decoder_model="decoder-base",
-        init_model=init_model,
         do_lower_case=False,
         warmup_proportion=0.1,
         gradient_accumulation_steps=1,
-        cache_dir="",
+        cache_dir=os.path.join(
+            str(PYTORCH_PRETRAINED_BERT_CACHE), "distributed"
+        ),
         fp16=False,
         fp16_opt_level="O1",
         task_type="retrieval",
@@ -52,7 +53,6 @@ def assign_model_args(data_path, features_path, init_model):
         cross_num_hidden_layers=2,
         freeze_layer_num=0,
         linear_patch="2d",
-        pretrained_clip_name="ViT-B/32",
     )
 
 
