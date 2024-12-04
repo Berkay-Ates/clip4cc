@@ -1,9 +1,8 @@
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 from torchvision.transforms import Compose, Normalize, Resize, ToTensor
-
-from PIL import Image
-from pathlib import Path
 
 # pytorch=1.7.1
 # pip install opencv-python
