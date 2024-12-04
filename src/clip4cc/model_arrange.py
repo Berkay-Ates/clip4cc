@@ -76,7 +76,9 @@ def load_model(model_file: str | os.PathLike) -> CLIP4IDC:
     return model.eval()
 
 
-def encode_text(model, text, device):
+def encode_text(
+    model: CLIP4IDC, text: str, device: torch.device
+) -> torch.Tensor:
     dataset = Clip4CCDataLoader(text_caption=text)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
