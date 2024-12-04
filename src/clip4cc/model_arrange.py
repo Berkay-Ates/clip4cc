@@ -56,7 +56,7 @@ def get_model_args():
     )
 
 
-def load_model(device, model_file=None):
+def load_model(model_file):
     args = get_model_args()
     if os.path.exists(model_file):
         model_state_dict = torch.load(model_file, map_location="cpu")
@@ -70,10 +70,7 @@ def load_model(device, model_file=None):
             state_dict=model_state_dict,
             task_config=args,
         )
-
-        model.to(device)
     else:
-        model = None
         raise FileNotFoundError(f"The path doesn't exists: {model_file}")
 
     return model.eval()
