@@ -43,7 +43,7 @@ def get_model_args():
         fp16=False,
         fp16_opt_level="O1",
         task_type="retrieval",
-        datatype="levircc",  # dataloader fixed as loading separate images
+        datatype="levircc",
         coef_lr=1.0,
         use_mil=False,
         sampled_use_mil=False,
