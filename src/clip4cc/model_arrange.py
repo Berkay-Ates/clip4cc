@@ -78,7 +78,7 @@ def load_model(args, device, model_file=None):
     return model.eval()
 
 
-def encode_text(model, text, device, dummy_img):
+def encode_text(model, text, device):
     dataset = Clip4CCDataLoader(text_caption=text)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
