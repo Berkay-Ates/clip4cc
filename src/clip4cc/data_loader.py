@@ -6,8 +6,8 @@ from clip4cc.tokenization_clip import SimpleTokenizer as ClipTokenizer
 
 
 def _extract_raw_sentences(sentence: str) -> list[str]:
-    tokens = sentence.split()  # Cümleyi boşluklara göre kelimelere ayır
-    return " ".join(tokens)  # Kelimeleri birleştir ve liste içinde döndür
+    tokens = sentence.split()
+    return " ".join(tokens)
 
 
 class Clip4CCDataLoader(Dataset):
