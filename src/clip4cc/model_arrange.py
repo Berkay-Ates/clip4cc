@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 
 import torch
 from PIL.Image import Image
@@ -99,11 +100,11 @@ def encode_text(
 
 def encode_image(
     model: CLIP4IDC,
-    img1_pth: Image,
-    img2_pth: Image,
+    img1: Image | Path,
+    img2: Image | Path,
     device: torch.device,
 ) -> torch.Tensor:
-    dataset = Clip4CCDataLoader(bef_img_path=img1_pth, aft_img_path=img2_pth)
+    dataset = Clip4CCDataLoader(bef_img_path=img1, aft_img_path=img2)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
