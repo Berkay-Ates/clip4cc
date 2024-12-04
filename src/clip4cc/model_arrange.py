@@ -2,6 +2,7 @@ import argparse
 import os
 
 import torch
+from PIL.Image import Image
 from torch.utils.data import DataLoader
 
 from clip4cc.data_loader import Clip4CCDataLoader
@@ -97,7 +98,12 @@ def encode_text(
     return sequence_output.squeeze()
 
 
-def encode_image(model, img1_pth, img2_pth, device):
+def encode_image(
+    model: CLIP4IDC,
+    img1_pth: Image,
+    img2_pth: Image,
+    device: torch.device,
+) -> torch.Tensor:
     dataset = Clip4CCDataLoader(bef_img_path=img1_pth, aft_img_path=img2_pth)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
