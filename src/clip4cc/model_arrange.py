@@ -10,7 +10,7 @@ from .file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from .modeling import CLIP4IDC
 
 
-def assign_model_args(data_path, features_path, init_model):
+def get_model_args():
     return argparse.Namespace(
         do_pretrain=False,
         do_train=False,
