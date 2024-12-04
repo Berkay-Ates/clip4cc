@@ -56,7 +56,7 @@ def get_model_args():
     )
 
 
-def load_model(model_file):
+def load_model(model_file: str | os.PathLike) -> CLIP4IDC:
     args = get_model_args()
     if os.path.exists(model_file):
         model_state_dict = torch.load(model_file, map_location="cpu")
