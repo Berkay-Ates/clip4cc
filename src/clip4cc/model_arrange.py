@@ -107,16 +107,15 @@ def encode_image(
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
-        for bid, batch in enumerate(dataloader):
-            batch = tuple(t.to(device) for t in batch)
-            (bef_image, aft_image, image_mask) = batch
+        batch = tuple(t.to(device) for t in next(iter(dataloader)))
+        (bef_image, aft_image, image_mask) = batch
 
-            image_pair = torch.cat([bef_image, aft_image], 1)
+        image_pair = torch.cat([bef_image, aft_image], 1)
 
-            visual_output, _ = model.get_visual_output(image_pair, image_mask)
-            visual_output = visual_output / visual_output.norm(
-                dim=-1, keepdim=True
-            )
+        visual_output, _ = model.get_visual_output(image_pair, image_mask)
+        visual_output = visual_output / visual_output.norm(
+            dim=-1, keepdim=True
+        )
 
     return visual_output.squeeze()
 
