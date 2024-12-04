@@ -97,6 +97,24 @@ class Clip4CCDataLoader(Dataset):
         bef_image_path = self.bef_img_path
         aft_image_path = self.aft_img_path
 
+        if (
+            self.bef_img_path is None or self.aft_img_path is None
+        ) and self.raw_sentence != "":
+            return self._get_text(self.raw_sentence)
+
+        if self.raw_sentence == "" and (
+            self.bef_img_path is not None and self.aft_img_path is not None
+        ):
+            bef_image = self._get_rawimage(bef_image_path)
+            aft_image = self._get_rawimage(aft_image_path)
+            image_mask = np.ones(2, dtype=np.int64)
+
+            return (
+                bef_image,
+                aft_image,
+                image_mask,
+            )
+
         pairs_text, pairs_mask, pairs_segment = self._get_text(
             self.raw_sentence
         )
