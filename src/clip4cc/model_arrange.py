@@ -90,11 +90,11 @@ def encode_text(
         sequence_output, _ = model.get_sequence_output(
             input_ids, segment_ids, input_mask
         )
-        sequence_output = sequence_output / sequence_output.norm(
-            dim=-1, keepdim=True
+        normalized_sequence_output: torch.Tensor = (
+            sequence_output / sequence_output.norm(dim=-1, keepdim=True)
         )
 
-    return sequence_output.squeeze()
+    return normalized_sequence_output.squeeze()
 
 
 def encode_image(
