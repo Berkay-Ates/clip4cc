@@ -100,11 +100,13 @@ def encode_text(
 
 def encode_image(
     model: CLIP4IDC,
-    img1: Image | Path,
-    img2: Image | Path,
+    before_image: Image | Path,
+    after_image: Image | Path,
     device: torch.device,
 ) -> torch.Tensor:
-    dataset = Clip4CCDataLoader(bef_img_path=img1, aft_img_path=img2)
+    dataset = Clip4CCDataLoader(
+        bef_img_path=before_image, aft_img_path=after_image
+    )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
