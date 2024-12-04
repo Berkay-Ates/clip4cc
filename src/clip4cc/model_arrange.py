@@ -82,9 +82,17 @@ def get_text_vec(model, text, device, dummy_img):
     dataset = Clip4CCDataLoader(text_caption=text)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    sequence_output, visual_output = eval_model(
-        model=model, dataloader=dataloader, device=device
-    )
+    with torch.no_grad():
+        for bid, batch in enumerate(dataloader):
+            batch = tuple(t.to(device) for t in batch)
+            (input_ids, input_mask, segment_ids) = batch
+
+            sequence_output, _ = model.get_sequence_output(
+                input_ids, segment_ids, input_mask
+            )
+            sequence_output = sequence_output / sequence_output.norm(
+                dim=-1, keepdim=True
+            )
 
     return sequence_output.squeeze()
 
