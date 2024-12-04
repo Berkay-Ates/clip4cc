@@ -18,9 +18,9 @@ class Clip4CCDataLoader(Dataset):
 
     def __init__(
         self,
-        bef_img_path,
-        aft_img_path,
-        text_caption,
+        bef_img_path=None,
+        aft_img_path=None,
+        text_caption="",
         tokenizer=ClipTokenizer(),
     ):
         self.tokenizer = tokenizer
