@@ -123,7 +123,9 @@ def encode_image(
     return normalized_visual_output.squeeze()
 
 
-def get_single_output(model, img1_pth, img2_pth, text, device):
+def get_single_output(
+    model, img1_pth, img2_pth, text, device
+) -> list[torch.Tensor]:
     dataset = Clip4CCDataLoader(
         bef_img_path=img1_pth, aft_img_path=img2_pth, text_caption=text
     )
@@ -133,7 +135,7 @@ def get_single_output(model, img1_pth, img2_pth, text, device):
         model=model, dataloader=dataloader, device=device
     )
 
-    return sequence_output, visual_output
+    return [sequence_output, visual_output]
 
 
 def eval_model(model, dataloader, device):
