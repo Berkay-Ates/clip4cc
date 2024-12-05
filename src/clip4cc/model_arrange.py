@@ -58,6 +58,22 @@ def get_model_args():
     )
 
 
+def visual_vector_embedding_dim(model_file: str) -> torch.Size:
+    if not os.path.exists(model_file):
+        raise FileNotFoundError(f"The path doesn't exists: {model_file}")
+
+    state_dict = torch.load(model_file, map_location="cpu", weights_only=True)
+    return state_dict["clip.visual.proj"][0].shape
+
+
+def text_vector_embedding_dim(model_file: str) -> torch.Size:
+    if not os.path.exists(model_file):
+        raise FileNotFoundError(f"The path doesn't exists: {model_file}")
+
+    state_dict = torch.load(model_file, map_location="cpu", weights_only=True)
+    return state_dict["clip.text_projection"][0].shape
+
+
 def load_model(model_file: str | os.PathLike) -> CLIP4IDC:
     args = get_model_args()
     if os.path.exists(model_file):
