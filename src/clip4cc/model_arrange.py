@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from clip4cc.data_loader import Clip4CCDataLoader
 
 from .file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from .modeling import CLIP4IDC
+from clip4cc.modeling import CLIP4IDC
 
 
 def get_model_args():
