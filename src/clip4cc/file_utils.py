@@ -1,34 +1,30 @@
 """
 Utilities for working with the local dataset cache.
-This file is adapted from the AllenNLP library
-at https://github.com/allenai/allennlp
+This file is adapted from the AllenNLP library at https://github.com/allenai/allennlp
 Copyright by the AllenNLP authors.
 """
 
-import json
-import logging
 import os
+import logging
 import shutil
 import tempfile
-from collections.abc import Callable
-from functools import wraps
-from hashlib import sha256
-from pathlib import Path
-from typing import IO
+import json
 from urllib.parse import urlparse
+from pathlib import Path
+from typing import Optional, Tuple, Union, IO, Callable, Set
+from hashlib import sha256
+from functools import wraps
+
+from tqdm import tqdm
 
 import boto3
-import requests
 from botocore.exceptions import ClientError
-from tqdm import tqdm
+import requests
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 PYTORCH_PRETRAINED_BERT_CACHE = Path(
-    os.getenv(
-        "PYTORCH_PRETRAINED_BERT_CACHE",
-        Path.home() / ".pytorch_pretrained_bert",
-    ),
+    os.getenv("PYTORCH_PRETRAINED_BERT_CACHE", Path.home() / ".pytorch_pretrained_bert")
 )
 
 
@@ -50,40 +46,33 @@ def url_to_filename(url: str, etag: str = None) -> str:
     return filename
 
 
-def filename_to_url(
-    filename: str,
-    cache_dir: str | Path = None,
-) -> tuple[str, str]:
-    """
-    Return the url and etag (which may be ``None``) stored for `filename`.
-    Raise ``FileNotFoundError`` if `filename` or its stored metadata do not
-    exist.
-    """
-    if cache_dir is None:
-        cache_dir = PYTORCH_PRETRAINED_BERT_CACHE
-    if isinstance(cache_dir, Path):
-        cache_dir = str(cache_dir)
+# def filename_to_url(filename: str, cache_dir: Union[str, Path] = None) -> Tuple[str, str]:
+#     """
+#     Return the url and etag (which may be ``None``) stored for `filename`.
+#     Raise ``FileNotFoundError`` if `filename` or its stored metadata do not exist.
+#     """
+#     if cache_dir is None:
+#         cache_dir = PYTORCH_PRETRAINED_BERT_CACHE
+#     if isinstance(cache_dir, Path):
+#         cache_dir = str(cache_dir)
 
-    cache_path = os.path.join(cache_dir, filename)
-    if not os.path.exists(cache_path):
-        raise FileNotFoundError(f"file {cache_path} not found")
+#     cache_path = os.path.join(cache_dir, filename)
+#     if not os.path.exists(cache_path):
+#         raise FileNotFoundError("file {} not found".format(cache_path))
 
-    meta_path = cache_path + ".json"
-    if not os.path.exists(meta_path):
-        raise FileNotFoundError(f"file {meta_path} not found")
+#     meta_path = cache_path + ".json"
+#     if not os.path.exists(meta_path):
+#         raise FileNotFoundError("file {} not found".format(meta_path))
 
-    with open(meta_path) as meta_file:
-        metadata = json.load(meta_file)
-    url = metadata["url"]
-    etag = metadata["etag"]
+#     with open(meta_path) as meta_file:
+#         metadata = json.load(meta_file)
+#     url = metadata["url"]
+#     etag = metadata["etag"]
 
-    return url, etag
+#     return url, etag
 
 
-def cached_path(
-    url_or_filename: str | Path,
-    cache_dir: str | Path = None,
-) -> str:
+def cached_path(url_or_filename: Union[str, Path], cache_dir: Union[str, Path] = None) -> str:
     """
     Given something that might be a URL (or might be a local path),
     determine which. If it's a URL, download the file and cache it, and
@@ -107,19 +96,17 @@ def cached_path(
         return url_or_filename
     elif parsed.scheme == "":
         # File, but it doesn't exist.
-        raise FileNotFoundError(f"file {url_or_filename} not found")
+        raise FileNotFoundError("file {} not found".format(url_or_filename))
     else:
         # Something unknown
-        raise ValueError(
-            f"unable to parse {url_or_filename} as a URL or as a local path",
-        )
+        raise ValueError("unable to parse {} as a URL or as a local path".format(url_or_filename))
 
 
-def split_s3_path(url: str) -> tuple[str, str]:
+def split_s3_path(url: str) -> Tuple[str, str]:
     """Split a full s3 path into the bucket name and path."""
     parsed = urlparse(url)
     if not parsed.netloc or not parsed.path:
-        raise ValueError(f"bad s3 path {url}")
+        raise ValueError("bad s3 path {}".format(url))
     bucket_name = parsed.netloc
     s3_path = parsed.path
     # Remove '/' at beginning of path.
@@ -140,7 +127,7 @@ def s3_request(func: Callable):
             return func(url, *args, **kwargs)
         except ClientError as exc:
             if int(exc.response["Error"]["Code"]) == 404:
-                raise FileNotFoundError(f"file {url} not found")
+                raise FileNotFoundError("file {} not found".format(url))
             else:
                 raise
 
@@ -148,7 +135,7 @@ def s3_request(func: Callable):
 
 
 @s3_request
-def s3_etag(url: str) -> str | None:
+def s3_etag(url: str) -> Optional[str]:
     """Check ETag on S3 object."""
     s3_resource = boto3.resource("s3")
     bucket_name, s3_path = split_s3_path(url)
@@ -176,7 +163,7 @@ def http_get(url: str, temp_file: IO) -> None:
     progress.close()
 
 
-def get_from_cache(url: str, cache_dir: str | Path = None) -> str:
+def get_from_cache(url: str, cache_dir: Union[str, Path] = None) -> str:
     """
     Given a URL, look for the corresponding dataset in the local cache.
     If it's not there, download it. Then return the path to the cached file.
@@ -194,9 +181,7 @@ def get_from_cache(url: str, cache_dir: str | Path = None) -> str:
     else:
         response = requests.head(url, allow_redirects=True)
         if response.status_code != 200:
-            raise OSError(
-                f"HEAD request failed for url {url} with status code {response.status_code}",
-            )
+            raise IOError("HEAD request failed for url {} with status code {}".format(url, response.status_code))
         etag = response.headers.get("ETag")
 
     filename = url_to_filename(url, etag)
@@ -206,14 +191,9 @@ def get_from_cache(url: str, cache_dir: str | Path = None) -> str:
 
     if not os.path.exists(cache_path):
         # Download to temporary file, then copy to cache dir once finished.
-        # Otherwise you get corrupt cache entries if the download gets
-        # interrupted.
+        # Otherwise you get corrupt cache entries if the download gets interrupted.
         with tempfile.NamedTemporaryFile() as temp_file:
-            logger.info(
-                "%s not found in cache, downloading to %s",
-                url,
-                temp_file.name,
-            )
+            logger.info("%s not found in cache, downloading to %s", url, temp_file.name)
 
             # GET file object
             if url.startswith("s3://"):
@@ -221,18 +201,12 @@ def get_from_cache(url: str, cache_dir: str | Path = None) -> str:
             else:
                 http_get(url, temp_file)
 
-            # we are copying the file before closing it, so flush to avoid
-            # truncation
+            # we are copying the file before closing it, so flush to avoid truncation
             temp_file.flush()
-            # shutil.copyfileobj() starts at the current position, so go to
-            # the start
+            # shutil.copyfileobj() starts at the current position, so go to the start
             temp_file.seek(0)
 
-            logger.info(
-                "copying %s to cache at %s",
-                temp_file.name,
-                cache_path,
-            )
+            logger.info("copying %s to cache at %s", temp_file.name, cache_path)
             with open(cache_path, "wb") as cache_file:
                 shutil.copyfileobj(temp_file, cache_file)
 
@@ -247,19 +221,19 @@ def get_from_cache(url: str, cache_dir: str | Path = None) -> str:
     return cache_path
 
 
-def read_set_from_file(filename: str) -> set[str]:
-    """
-    Extract a de-duped collection (set) of text from a file.
-    Expected file format is one item per line.
-    """
-    collection = set()
-    with open(filename, encoding="utf-8") as file_:
-        for line in file_:
-            collection.add(line.rstrip())
-    return collection
+# def read_set_from_file(filename: str) -> Set[str]:
+#     """
+#     Extract a de-duped collection (set) of text from a file.
+#     Expected file format is one item per line.
+#     """
+#     collection = set()
+#     with open(filename, "r", encoding="utf-8") as file_:
+#         for line in file_:
+#             collection.add(line.rstrip())
+#     return collection
 
 
-def get_file_extension(path: str, dot=True, lower: bool = True):
-    ext = os.path.splitext(path)[1]
-    ext = ext if dot else ext[1:]
-    return ext.lower() if lower else ext
+# def get_file_extension(path: str, dot=True, lower: bool = True):
+#     ext = os.path.splitext(path)[1]
+#     ext = ext if dot else ext[1:]
+#     return ext.lower() if lower else ext

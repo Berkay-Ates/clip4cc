@@ -1,5 +1,5 @@
-# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc.\
-# team.
+# coding=utf-8
+# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +15,25 @@
 # limitations under the License.
 """PyTorch BERT model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import os
 import copy
 import json
-import logging
 import math
+import logging
+import tarfile
+import tempfile
+import shutil
 
 import torch
 from torch import nn
-
+import torch.nn.functional as F
+from .file_utils import cached_path
 from .until_config import PretrainedConfig
-from .until_module import ACT2FN, LayerNorm, PreTrainedModel
+from .until_module import PreTrainedModel, LayerNorm, ACT2FN
 
 logger = logging.getLogger(__name__)
 
@@ -54,40 +63,32 @@ class CrossConfig(PretrainedConfig):
         type_vocab_size=2,
         initializer_range=0.02,
     ):
-        """
-        Constructs CrossConfig.
+        """Constructs CrossConfig.
 
         Args:
-            vocab_size_or_config_json_file: Vocabulary size of `inputs_ids` in\
-                `CrossModel`.
+            vocab_size_or_config_json_file: Vocabulary size of `inputs_ids` in `CrossModel`.
             hidden_size: Size of the encoder layers and the pooler layer.
-            num_hidden_layers: Number of hidden layers in the Transformer\
-                encoder.
-            num_attention_heads: Number of attention heads for each attention
+            num_hidden_layers: Number of hidden layers in the Transformer encoder.
+            num_attention_heads: Number of attention heads for each attention layer in
+                the Transformer encoder.
+            intermediate_size: The size of the "intermediate" (i.e., feed-forward)
                 layer in the Transformer encoder.
-            intermediate_size: The size of the "intermediate"\
-                (i.e., feed-forward) layer in the Transformer encoder.
-            hidden_act: The non-linear activation function (function or\
-                string) in the encoder and pooler. If string, "gelu", "relu"\
-                and "swish" are supported.
-            hidden_dropout_prob: The dropout probabilitiy for all fully\
-                connected layers in the embeddings, encoder, and pooler.
+            hidden_act: The non-linear activation function (function or string) in the
+                encoder and pooler. If string, "gelu", "relu" and "swish" are supported.
+            hidden_dropout_prob: The dropout probabilitiy for all fully connected
+                layers in the embeddings, encoder, and pooler.
             attention_probs_dropout_prob: The dropout ratio for the attention
                 probabilities.
-            max_position_embeddings: The maximum sequence length that this\
-                model might ever be used with. Typically set this to something\
-                large just in case (e.g., 512 or 1024 or 2048).
-            type_vocab_size: The vocabulary size of the `token_type_ids`\
-                passed into `CrossModel`.
-            initializer_range: The sttdev of the truncated_normal_initializer\
-                for initializing all weight matrices.
-
+            max_position_embeddings: The maximum sequence length that this model might
+                ever be used with. Typically set this to something large just in case
+                (e.g., 512 or 1024 or 2048).
+            type_vocab_size: The vocabulary size of the `token_type_ids` passed into
+                `CrossModel`.
+            initializer_range: The sttdev of the truncated_normal_initializer for
+                initializing all weight matrices.
         """
         if isinstance(vocab_size_or_config_json_file, str):
-            with open(
-                vocab_size_or_config_json_file,
-                encoding="utf-8",
-            ) as reader:
+            with open(vocab_size_or_config_json_file, "r", encoding="utf-8") as reader:
                 json_config = json.loads(reader.read())
             for key, value in json_config.items():
                 self.__dict__[key] = value
@@ -106,60 +107,37 @@ class CrossConfig(PretrainedConfig):
         else:
             raise ValueError(
                 "First argument must be either a vocabulary size (int)"
-                "or the path to a pretrained model config file (str)",
+                "or the path to a pretrained model config file (str)"
             )
 
 
 class CrossEmbeddings(nn.Module):
-    """
-    Construct the embeddings from word, position and token_type embeddings.
-    """
+    """Construct the embeddings from word, position and token_type embeddings."""
 
     def __init__(self, config):
-        super().__init__()
+        super(CrossEmbeddings, self).__init__()
 
-        self.position_embeddings = nn.Embedding(
-            config.max_position_embeddings,
-            config.hidden_size,
-        )
-        self.token_type_embeddings = nn.Embedding(
-            config.type_vocab_size,
-            config.hidden_size,
-        )
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        # self.LayerNorm is not snake-cased to stick with TensorFlow model
-        # variable name and be able to load
+        # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
         self.LayerNorm = LayerNorm(config.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, concat_embeddings, concat_type=None):
-        batch_size, seq_length = (
-            concat_embeddings.size(
-                0,
-            ),
-            concat_embeddings.size(1),
-        )
-        if concat_type is None:
-            concat_type = torch.zeros(batch_size, concat_type).to(
-                concat_embeddings.device,
-            )
 
-        position_ids = torch.arange(
-            seq_length,
-            dtype=torch.long,
-            device=concat_embeddings.device,
-        )
-        position_ids = position_ids.unsqueeze(
-            0,
-        ).expand(concat_embeddings.size(0), -1)
+        batch_size, seq_length = concat_embeddings.size(0), concat_embeddings.size(1)
+        if concat_type is None:
+            concat_type = torch.zeros(batch_size, concat_type).to(concat_embeddings.device)
+
+        position_ids = torch.arange(seq_length, dtype=torch.long, device=concat_embeddings.device)
+        position_ids = position_ids.unsqueeze(0).expand(concat_embeddings.size(0), -1)
 
         token_type_embeddings = self.token_type_embeddings(concat_type)
         position_embeddings = self.position_embeddings(position_ids)
 
-        embeddings = (
-            concat_embeddings + position_embeddings + token_type_embeddings
-        )
+        embeddings = concat_embeddings + position_embeddings + token_type_embeddings
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -167,23 +145,15 @@ class CrossEmbeddings(nn.Module):
 
 class CrossSelfAttention(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossSelfAttention, self).__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
-                "The hidden size (%d) is not a multiple of the number of "
-                "attention heads (%d)"
-                % (
-                    config.hidden_size,
-                    config.num_attention_heads,
-                ),
+                "The hidden size (%d) is not a multiple of the number of attention "
+                "heads (%d)" % (config.hidden_size, config.num_attention_heads)
             )
         self.num_attention_heads = config.num_attention_heads
-        self.attention_head_size = int(
-            config.hidden_size / config.num_attention_heads,
-        )
-        self.all_head_size = (
-            self.num_attention_heads * self.attention_head_size
-        )
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
+        self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
@@ -192,10 +162,7 @@ class CrossSelfAttention(nn.Module):
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.size()[:-1] + (
-            self.num_attention_heads,
-            self.attention_head_size,
-        )
+        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -208,17 +175,10 @@ class CrossSelfAttention(nn.Module):
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)
 
-        # Take the dot product between "query" and "key" to get the raw
-        # attention scores.
-        attention_scores = torch.matmul(
-            query_layer,
-            key_layer.transpose(-1, -2),
-        )
-        attention_scores = attention_scores / math.sqrt(
-            self.attention_head_size,
-        )
-        # Apply the attention mask is (precomputed for all layers in
-        # CrossModel forward() function)
+        # Take the dot product between "query" and "key" to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        # Apply the attention mask is (precomputed for all layers in CrossModel forward() function)
         attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
@@ -230,16 +190,14 @@ class CrossSelfAttention(nn.Module):
 
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (
-            self.all_head_size,
-        )
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
         return context_layer
 
 
 class CrossSelfOutput(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossSelfOutput, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.LayerNorm = LayerNorm(config.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -253,7 +211,7 @@ class CrossSelfOutput(nn.Module):
 
 class CrossAttention(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossAttention, self).__init__()
         self.self = CrossSelfAttention(config)
         self.output = CrossSelfOutput(config)
 
@@ -265,12 +223,10 @@ class CrossAttention(nn.Module):
 
 class CrossIntermediate(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossIntermediate, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.intermediate_act_fn = (
-            ACT2FN[config.hidden_act]
-            if isinstance(config.hidden_act, str)
-            else config.hidden_act
+            ACT2FN[config.hidden_act] if isinstance(config.hidden_act, str) else config.hidden_act
         )
 
     def forward(self, hidden_states):
@@ -281,7 +237,7 @@ class CrossIntermediate(nn.Module):
 
 class CrossOutput(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossOutput, self).__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
         self.LayerNorm = LayerNorm(config.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -295,7 +251,7 @@ class CrossOutput(nn.Module):
 
 class CrossLayer(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossLayer, self).__init__()
         self.attention = CrossAttention(config)
         self.intermediate = CrossIntermediate(config)
         self.output = CrossOutput(config)
@@ -309,18 +265,11 @@ class CrossLayer(nn.Module):
 
 class CrossEncoder(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossEncoder, self).__init__()
         layer = CrossLayer(config)
-        self.layer = nn.ModuleList(
-            [copy.deepcopy(layer) for _ in range(config.num_hidden_layers)],
-        )
+        self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(config.num_hidden_layers)])
 
-    def forward(
-        self,
-        hidden_states,
-        attention_mask,
-        output_all_encoded_layers=True,
-    ):
+    def forward(self, hidden_states, attention_mask, output_all_encoded_layers=True):
         all_encoder_layers = []
         for layer_module in self.layer:
             hidden_states = layer_module(hidden_states, attention_mask)
@@ -333,7 +282,7 @@ class CrossEncoder(nn.Module):
 
 class CrossPooler(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossPooler, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
@@ -348,13 +297,9 @@ class CrossPooler(nn.Module):
 
 class CrossPredictionHeadTransform(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossPredictionHeadTransform, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.transform_act_fn = (
-            ACT2FN[config.hidden_act]
-            if isinstance(config.hidden_act, str)
-            else config.hidden_act
-        )
+        self.transform_act_fn = ACT2FN[config.hidden_act] if isinstance(config.hidden_act, str) else config.hidden_act
         self.LayerNorm = LayerNorm(config.hidden_size, eps=1e-12)
 
     def forward(self, hidden_states):
@@ -366,22 +311,16 @@ class CrossPredictionHeadTransform(nn.Module):
 
 class CrossLMPredictionHead(nn.Module):
     def __init__(self, config, cross_model_embedding_weights):
-        super().__init__()
+        super(CrossLMPredictionHead, self).__init__()
         self.transform = CrossPredictionHeadTransform(config)
 
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
         self.decoder = nn.Linear(
-            cross_model_embedding_weights.size(1),
-            cross_model_embedding_weights.size(0),
-            bias=False,
+            cross_model_embedding_weights.size(1), cross_model_embedding_weights.size(0), bias=False
         )
         self.decoder.weight = cross_model_embedding_weights
-        self.bias = nn.Parameter(
-            torch.zeros(
-                cross_model_embedding_weights.size(0),
-            ),
-        )
+        self.bias = nn.Parameter(torch.zeros(cross_model_embedding_weights.size(0)))
 
     def forward(self, hidden_states):
         hidden_states = self.transform(hidden_states)
@@ -391,11 +330,8 @@ class CrossLMPredictionHead(nn.Module):
 
 class CrossOnlyMLMHead(nn.Module):
     def __init__(self, config, cross_model_embedding_weights):
-        super().__init__()
-        self.predictions = CrossLMPredictionHead(
-            config,
-            cross_model_embedding_weights,
-        )
+        super(CrossOnlyMLMHead, self).__init__()
+        self.predictions = CrossLMPredictionHead(config, cross_model_embedding_weights)
 
     def forward(self, sequence_output):
         prediction_scores = self.predictions(sequence_output)
@@ -404,7 +340,7 @@ class CrossOnlyMLMHead(nn.Module):
 
 class CrossOnlyNSPHead(nn.Module):
     def __init__(self, config):
-        super().__init__()
+        super(CrossOnlyNSPHead, self).__init__()
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, pooled_output):
@@ -414,11 +350,8 @@ class CrossOnlyNSPHead(nn.Module):
 
 class CrossPreTrainingHeads(nn.Module):
     def __init__(self, config, cross_model_embedding_weights):
-        super().__init__()
-        self.predictions = CrossLMPredictionHead(
-            config,
-            cross_model_embedding_weights,
-        )
+        super(CrossPreTrainingHeads, self).__init__()
+        self.predictions = CrossLMPredictionHead(config, cross_model_embedding_weights)
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
@@ -429,51 +362,37 @@ class CrossPreTrainingHeads(nn.Module):
 
 class CrossModel(PreTrainedModel):
     def __init__(self, config):
-        super().__init__(config)
+        super(CrossModel, self).__init__(config)
         self.embeddings = CrossEmbeddings(config)
         self.encoder = CrossEncoder(config)
         self.pooler = CrossPooler(config)
         self.apply(self.init_weights)
 
-    def forward(
-        self,
-        concat_input,
-        concat_type=None,
-        attention_mask=None,
-        output_all_encoded_layers=True,
-    ):
+    def forward(self, concat_input, concat_type=None, attention_mask=None, output_all_encoded_layers=True):
+
         if attention_mask is None:
-            attention_mask = torch.ones(
-                concat_input.size(0),
-                concat_input.size(1),
-            )
+            attention_mask = torch.ones(concat_input.size(0), concat_input.size(1))
         if concat_type is None:
             concat_type = torch.zeros_like(attention_mask)
 
         # We create a 3D attention mask from a 2D tensor mask.
         # Sizes are [batch_size, 1, 1, to_seq_length]
-        # So we can broadcast to
-        # [batch_size, num_heads, from_seq_length,to_seq_length]
-        # this attention mask is more simple than the triangular masking of
-        # causal attention used in OpenAI GPT, we just need to prepare the
-        # broadcast dimension here.
+        # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
+        # this attention mask is more simple than the triangular masking of causal attention
+        # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
 
-        # Since attention_mask is 1.0 for positions we want to attend and 0.0
-        # for # masked positions, this operation will create a tensor which is
-        # 0.0 for # positions we want to attend and -10000.0 for masked
-        # positions.  # Since we are adding it to the raw scores before the
-        # softmax, this is effectively the same as removing these entirely.
-        extended_attention_mask = extended_attention_mask.to(
-            dtype=self.dtype,
-        )  # fp16 compatibility
+        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = extended_attention_mask.to(dtype=self.dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         embedding_output = self.embeddings(concat_input, concat_type)
         encoded_layers = self.encoder(
-            embedding_output,
-            extended_attention_mask,
-            output_all_encoded_layers=output_all_encoded_layers,
+            embedding_output, extended_attention_mask, output_all_encoded_layers=output_all_encoded_layers
         )
         sequence_output = encoded_layers[-1]
         pooled_output = self.pooler(sequence_output)

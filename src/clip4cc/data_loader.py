@@ -20,6 +20,8 @@ class Clip4CCDataLoader(Dataset):
         self,
         bef_img_path=None,
         aft_img_path=None,
+        bef_sem_img_path=None,
+        aft_sem_img_path=None,
         text_caption="",
         tokenizer=ClipTokenizer(),
     ):
@@ -28,6 +30,9 @@ class Clip4CCDataLoader(Dataset):
         self.bef_img_path = bef_img_path
         self.aft_img_path = aft_img_path
 
+        self.bef_sem_img_path = bef_sem_img_path
+        self.aft_sem_img_path = aft_sem_img_path
+        
         self.raw_sentence = _extract_raw_sentences(text_caption)
 
         self.sample_len = 1
@@ -97,6 +102,9 @@ class Clip4CCDataLoader(Dataset):
         bef_image_path = self.bef_img_path
         aft_image_path = self.aft_img_path
 
+        bef_sem_image_path = self.bef_sem_img_path
+        aft_sem_image_path = self.aft_sem_img_path
+
         if (
             self.bef_img_path is None or self.aft_img_path is None
         ) and self.raw_sentence != "":
@@ -107,11 +115,15 @@ class Clip4CCDataLoader(Dataset):
         ):
             bef_image = self._get_rawimage(bef_image_path)
             aft_image = self._get_rawimage(aft_image_path)
+            bef_sem_image = self._get_rawimage(bef_sem_image_path)
+            aft_sem_image = self._get_rawimage(aft_sem_image_path)
             image_mask = np.ones(2, dtype=np.int64)
 
             return (
                 bef_image,
                 aft_image,
+                bef_sem_image,
+                aft_sem_image,
                 image_mask,
             )
 
@@ -120,6 +132,8 @@ class Clip4CCDataLoader(Dataset):
         )
         bef_image = self._get_rawimage(bef_image_path)
         aft_image = self._get_rawimage(aft_image_path)
+        bef_sem_image = self._get_rawimage(bef_sem_image_path)
+        aft_sem_image = self._get_rawimage(aft_sem_image_path)
         image_mask = np.ones(2, dtype=np.int64)
 
         return (
@@ -128,5 +142,7 @@ class Clip4CCDataLoader(Dataset):
             pairs_segment,
             bef_image,
             aft_image,
+            bef_sem_image,
+            aft_sem_image,
             image_mask,
         )

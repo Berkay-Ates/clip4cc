@@ -1,5 +1,5 @@
-# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc.\
-# team.
+# coding=utf-8
+# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,25 +16,20 @@
 """PyTorch BERT model."""
 
 import logging
-import math
-
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch import nn
-
-from .until_config import PretrainedConfig
+import torch.nn.functional as F
+import math
+from modules.until_config import PretrainedConfig
 
 logger = logging.getLogger(__name__)
 
 
 def gelu(x):
-    """
-    Implementation of the gelu activation function.
-    For information: OpenAI GPT's gelu is slightly different
-    (and gives slightly different results):
-    0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 *
-                                                        torch.pow(x, 3))))
+    """Implementation of the gelu activation function.
+    For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
+    0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
     """
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
@@ -48,11 +43,8 @@ ACT2FN = {"gelu": gelu, "relu": torch.nn.functional.relu, "swish": swish}
 
 class LayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-12):
-        """
-        Construct a layernorm module in the TF style
-        (epsilon inside the square root).
-        """
-        super().__init__()
+        """Construct a layernorm module in the TF style (epsilon inside the square root)."""
+        super(LayerNorm, self).__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.bias = nn.Parameter(torch.zeros(hidden_size))
         self.variance_epsilon = eps
@@ -65,32 +57,28 @@ class LayerNorm(nn.Module):
 
 
 class PreTrainedModel(nn.Module):
-    """
-    An abstract class to handle weights initialization and
-    a simple interface for downloading and loading pretrained models.
+    """An abstract class to handle weights initialization and
+    a simple interface for dowloading and loading pretrained models.
     """
 
     def __init__(self, config, *inputs, **kwargs):
-        super().__init__()
+        super(PreTrainedModel, self).__init__()
         if not isinstance(config, PretrainedConfig):
             raise ValueError(
-                f"Parameter config in `{self.__class__.__name__}(config)` should be an instance of "
-                "class `PretrainedConfig`. "
+                "Parameter config in `{}(config)` should be an instance of class `PretrainedConfig`. "
                 "To create a model from a Google pretrained model use "
-                f"`model = {self.__class__.__name__}.from_pretrained(PRETRAINED_MODEL_NAME)`",
+                "`model = {}.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
+                    self.__class__.__name__, self.__class__.__name__
+                )
             )
         self.config = config
 
     def init_weights(self, module):
         """Initialize the weights."""
         if isinstance(module, (nn.Linear, nn.Embedding)):
-            # Slightly different from the TF version which uses
-            # truncated_normal for initialization
+            # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
-            module.weight.data.normal_(
-                mean=0.0,
-                std=self.config.initializer_range,
-            )
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
         elif isinstance(module, LayerNorm):
             if "beta" in dir(module) and "gamma" in dir(module):
                 module.beta.data.zero_()
@@ -106,9 +94,11 @@ class PreTrainedModel(nn.Module):
 
     @classmethod
     def init_preweight(cls, model, state_dict, prefix=None, task_config=None):
+        state_dict_copy = state_dict.copy()
+
         old_keys = []
         new_keys = []
-        for key in state_dict.keys():
+        for key in state_dict_copy.keys():
             new_key = None
             if "gamma" in key:
                 new_key = key.replace("gamma", "weight")
@@ -117,44 +107,43 @@ class PreTrainedModel(nn.Module):
             if new_key:
                 old_keys.append(key)
                 new_keys.append(new_key)
-        for old_key, new_key in zip(old_keys, new_keys, strict=False):
-            state_dict[new_key] = state_dict.pop(old_key)
+        for old_key, new_key in zip(old_keys, new_keys):
+            state_dict_copy[new_key] = state_dict_copy.pop(old_key)
+
+        has_semantic_v = any(k.startswith("clip.semantic_v.") for k in state_dict_copy.keys())
+
+        if not has_semantic_v:
+            logger.info("Copying visual weights to semantic_v weights...")
+            visual_keys = [k for k in state_dict_copy.keys() if k.startswith("clip.visual.")]
+            for key in visual_keys:
+                semantic_key = key.replace("visual.", "semantic_v.")
+                state_dict_copy[semantic_key] = state_dict_copy[key].clone()
+        else:
+            logger.info("Semantic_v weights already exist in state_dict, skipping copy from visual weights.")
 
         if prefix is not None:
             old_keys = []
             new_keys = []
-            for key in state_dict.keys():
-                old_keys.append(key)
-                new_keys.append(prefix + key)
-            for old_key, new_key in zip(old_keys, new_keys, strict=False):
-                state_dict[new_key] = state_dict.pop(old_key)
+            for key in state_dict_copy.keys():
+                # Add prefix only if it's not already part of the key
+                if not key.startswith(prefix):
+                    old_keys.append(key)
+                    new_keys.append(prefix + key)
+            for old_key, new_key in zip(old_keys, new_keys):
+                state_dict_copy[new_key] = state_dict_copy.pop(old_key)
 
         missing_keys = []
         unexpected_keys = []
         error_msgs = []
-        # copy state_dict so _load_from_state_dict can modify it
-        metadata = getattr(state_dict, "_metadata", None)
-        state_dict = state_dict.copy()
+
+        metadata = getattr(state_dict_copy, "_metadata", None)
         if metadata is not None:
-            state_dict._metadata = metadata
+            state_dict_copy._metadata = metadata
 
         def load(module, prefix=""):
-            local_metadata = (
-                {}
-                if metadata is None
-                else metadata.get(
-                    prefix[:-1],
-                    {},
-                )
-            )
+            local_metadata = {} if metadata is None else metadata.get(prefix[:-1], {})
             module._load_from_state_dict(
-                state_dict,
-                prefix,
-                local_metadata,
-                True,
-                missing_keys,
-                unexpected_keys,
-                error_msgs,
+                state_dict_copy, prefix, local_metadata, True, missing_keys, unexpected_keys, error_msgs
             )
             for name, child in module._modules.items():
                 if child is not None:
@@ -162,52 +151,49 @@ class PreTrainedModel(nn.Module):
 
         load(model, prefix="")
 
-        if prefix is None and (
-            task_config is None or task_config.local_rank == 0
-        ):
-            logger.info("-" * 20)
+        # Log information about missing and unexpected weights
+        if prefix is None and (task_config is None or task_config.local_rank == 0):
+
+            logger.info("-" * 200)
+
+            print("1")
             if len(missing_keys) > 0:
-                logger.info(
-                    "Weights of "
-                    "{} not initialized from pretrained model: {}".format(
-                        model.__class__.__name__,
-                        "\n   " + "\n   ".join(missing_keys),
-                    ),
+                logger.warning(
+                    "The following weights were not initialized from the pretrained model: {}".format(
+                        "\n   " + "\n   ".join(missing_keys)
+                    )
                 )
+            print("1")
+            print("2")
             if len(unexpected_keys) > 0:
-                logger.info(
-                    "Weights from pretrained model not used in {}: {}".format(
-                        model.__class__.__name__,
-                        "\n   " + "\n   ".join(unexpected_keys),
-                    ),
+                logger.warning(
+                    "The following weights from the pretrained model were not used: {}".format(
+                        "\n   " + "\n   ".join(unexpected_keys)
+                    )
                 )
+            print("2")
+            print("3")
             if len(error_msgs) > 0:
                 logger.error(
-                    "Weights from pretrained model cause "
-                    "errors in {}: {}".format(
-                        model.__class__.__name__,
-                        "\n   " + "\n   ".join(error_msgs),
-                    ),
+                    "The following weights from the pretrained model caused errors: {}".format(
+                        "\n   " + "\n   ".join(error_msgs)
+                    )
                 )
+            print("3")
 
         return model
 
     @property
     def dtype(self):
         """
-        :obj:`torch.dtype`: The dtype of the module (assuming that all the\
-            module parameters have the same dtype).
+        :obj:`torch.dtype`: The dtype of the module (assuming that all the module parameters have the same dtype).
         """
         try:
             return next(self.parameters()).dtype
         except StopIteration:
             # For nn.DataParallel compatibility in PyTorch 1.5
             def find_tensor_attributes(module: nn.Module):
-                tuples = [
-                    (k, v)
-                    for k, v in module.__dict__.items()
-                    if torch.is_tensor(v)
-                ]
+                tuples = [(k, v) for k, v in module.__dict__.items() if torch.is_tensor(v)]
                 return tuples
 
             gen = self._named_members(get_members_fn=find_tensor_attributes)
@@ -217,9 +203,8 @@ class PreTrainedModel(nn.Module):
     @classmethod
     def from_pretrained(cls, config, state_dict=None, *inputs, **kwargs):
         """
-        Instantiate a PreTrainedModel from a pre-trained model file or a
-        pytorch state dict. Download and cache the pre-trained model file if
-        needed.
+        Instantiate a PreTrainedModel from a pre-trained model file or a pytorch state dict.
+        Download and cache the pre-trained model file if needed.
         """
         # Instantiate model.
         model = cls(config, *inputs, **kwargs)
@@ -231,13 +216,13 @@ class PreTrainedModel(nn.Module):
 
 
 ##################################
-# ##### LOSS FUNCTION ############
+###### LOSS FUNCTION #############
 ##################################
-
-
 class CrossEn(nn.Module):
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+    ):
+        super(CrossEn, self).__init__()
 
     def forward(self, sim_matrix):
         logpt = F.log_softmax(sim_matrix, dim=-1)
@@ -248,8 +233,12 @@ class CrossEn(nn.Module):
 
 
 class MILNCELoss(nn.Module):
-    def __init__(self, batch_size=1, n_pair=1):
-        super().__init__()
+    def __init__(
+        self,
+        batch_size=1,
+        n_pair=1,
+    ):
+        super(MILNCELoss, self).__init__()
         self.batch_size = batch_size
         self.n_pair = n_pair
         torch_v = float(".".join(torch.__version__.split(".")[:2]))
@@ -263,27 +252,18 @@ class MILNCELoss(nn.Module):
         from_text_matrix = sim_matrix + mm_mask * -1e12
         from_video_matrix = sim_matrix.transpose(1, 0)
 
-        new_sim_matrix = torch.cat(
-            [from_video_matrix, from_text_matrix],
-            dim=-1,
-        )
+        new_sim_matrix = torch.cat([from_video_matrix, from_text_matrix], dim=-1)
         logpt = F.log_softmax(new_sim_matrix, dim=-1)
 
         mm_mask_logpt = torch.cat([mm_mask, torch.zeros_like(mm_mask)], dim=-1)
-        masked_logpt = (
-            logpt + (torch.ones_like(mm_mask_logpt) - mm_mask_logpt) * -1e12
-        )
+        masked_logpt = logpt + (torch.ones_like(mm_mask_logpt) - mm_mask_logpt) * -1e12
 
         new_logpt = -torch.logsumexp(masked_logpt, dim=-1)
 
         logpt_choice = torch.zeros_like(new_logpt)
-        mark_ind = torch.arange(self.batch_size).to(
-            sim_matrix.device,
-        ) * self.n_pair + (self.n_pair // 2)
+        mark_ind = torch.arange(self.batch_size).to(sim_matrix.device) * self.n_pair + (self.n_pair // 2)
         logpt_choice[mark_ind] = 1
-        sim_loss = new_logpt.masked_select(
-            logpt_choice.to(dtype=self.bool_dtype),
-        ).mean()
+        sim_loss = new_logpt.masked_select(logpt_choice.to(dtype=self.bool_dtype)).mean()
         return sim_loss
 
 
@@ -296,7 +276,7 @@ class MaxMarginRankingLoss(nn.Module):
         n_pair=1,
         hard_negative_rate=0.5,
     ):
-        super().__init__()
+        super(MaxMarginRankingLoss, self).__init__()
         self.margin = margin
         self.n_pair = n_pair
         self.batch_size = batch_size
@@ -304,21 +284,15 @@ class MaxMarginRankingLoss(nn.Module):
         self.easy_negative_rate = easy_negative_rate
         self.negative_weighting = negative_weighting
         if n_pair > 1 and batch_size > 1:
-            alpha = easy_negative_rate / (
-                (batch_size - 1) * (1 - easy_negative_rate)
-            )
+            alpha = easy_negative_rate / ((batch_size - 1) * (1 - easy_negative_rate))
             mm_mask = (1 - alpha) * np.eye(self.batch_size) + alpha
             mm_mask = np.kron(mm_mask, np.ones((n_pair, n_pair)))
-            mm_mask = torch.tensor(mm_mask) * (
-                batch_size * (1 - easy_negative_rate)
-            )
+            mm_mask = torch.tensor(mm_mask) * (batch_size * (1 - easy_negative_rate))
             self.mm_mask = mm_mask.float()
 
     def forward(self, x):
         d = torch.diag(x)
-        max_margin = F.relu(self.margin + x - d.view(-1, 1)) + F.relu(
-            self.margin + x - d.view(1, -1),
-        )
+        max_margin = F.relu(self.margin + x - d.view(-1, 1)) + F.relu(self.margin + x - d.view(1, -1))
         if self.negative_weighting and self.n_pair > 1 and self.batch_size > 1:
             max_margin = max_margin * self.mm_mask.to(max_margin.device)
         return max_margin.mean()
@@ -338,8 +312,6 @@ class AllGather(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         return (
-            grad_output[
-                ctx.batch_size * ctx.rank : ctx.batch_size * (ctx.rank + 1)
-            ],
+            grad_output[ctx.batch_size * ctx.rank : ctx.batch_size * (ctx.rank + 1)],
             None,
         )
