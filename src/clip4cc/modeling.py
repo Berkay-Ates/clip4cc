@@ -1,19 +1,12 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import logging
 
 import torch
 from torch import nn
-from torch.nn import CrossEntropyLoss
 
-from modules.until_module import PreTrainedModel, AllGather, CrossEn
-from modules.module_cross import CrossModel, CrossConfig
-from modules.module_decoder import DecoderModel, DecoderConfig
-
-from modules.module_clip import CLIP, convert_weights
-from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
+from clip4cc.module_clip import CLIP, convert_weights
+from clip4cc.module_cross import CrossConfig
+from clip4cc.module_decoder import DecoderConfig
+from clip4cc.until_module import CrossEn, PreTrainedModel
 
 logger = logging.getLogger(__name__)
 # allgather = AllGather.apply
