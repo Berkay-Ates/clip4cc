@@ -13,6 +13,10 @@ import torch.nn.functional as F
 from torch import nn
 from tqdm import tqdm
 
+# from logging import Logger
+# from clip4cc.utils import get_logger
+
+# global logger
 
 _MODELS = {
     "RN50": "https://openaipublic.azureedge.net/clip/models/afeb0e10f9e5a86da6080e35cf09123aca3b358a0c3e3b6c78a7b63bc04b6762/RN50.pt",  # noqa: E501
@@ -351,8 +355,13 @@ class ResidualAttentionBlock(nn.Module):
 
     def forward(self, x_tuple: tuple):
         x, video_frame = x_tuple
+
+        # logger.info("ResidualAttentionBlock x.shape: {}".format(x.shape))
+
         x = x + self.attention(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
+
+        # logger.info("ResidualAttentionBlock x.shape: {}".format(x.shape))
         return (x, video_frame)
 
     def visualize_attention(self, x: torch.Tensor):
@@ -383,7 +392,11 @@ class Transformer(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, video_frame=-1):
-        return self.resblocks((x, video_frame))[0]
+        # logger.info("Transformer x.shape: {}".format(x.shape))
+        # logger.info("~ TEXT ~")
+        result = self.resblocks((x, video_frame))[0]
+        # logger.info("Transformer result.shape: {}".format(result.shape))
+        return result
 
 
 class VisualTransformer(nn.Module):
@@ -403,6 +416,15 @@ class VisualTransformer(nn.Module):
         self.output_dim = output_dim
         self.intra_layers = intra_layers
 
+        # logger.info(f"input_resolution: {input_resolution}")
+        # logger.info(f"patch_size: {patch_size}")
+        # logger.info(f"width: {width}")
+        # logger.info(f"layers: {layers}")
+        # logger.info(f"heads: {heads}")
+        # logger.info(f"output_dim: {output_dim}")
+        # logger.info(f"linear_patch: {linear_patch}")
+        # logger.info(f"intra_layers: {intra_layers}")
+
         self.conv1 = nn.Conv2d(
             in_channels=3,
             out_channels=width,
@@ -413,9 +435,7 @@ class VisualTransformer(nn.Module):
 
         scale = width**-0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
-        self.positional_embedding = nn.Parameter(
-            scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width),
-        )
+        self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
         self.ln_pre = LayerNorm(width)
 
         self.joint_positional_embedding = nn.Parameter(
@@ -447,7 +467,7 @@ class VisualTransformer(nn.Module):
                 bias=False,
             )
 
-    def forward(self, x: torch.Tensor, video_frame=-1, visualize=False):
+    def forward(self, x: torch.Tensor, video_frame=-1, visualize=False,rsformer=False):
         if self.linear_patch == "3d":
             assert video_frame != -1
             x_3d = x.reshape(
@@ -468,11 +488,16 @@ class VisualTransformer(nn.Module):
                 x_3d.shape[-1],
             ).contiguous()  # shape = [*, width, grid, grid]
         else:
+            # logger.info("1- VisualTransformer x.shape: {}".format(x.shape))
             x = self.conv1(x)  # shape = [*, width, grid, grid]
+            # logger.info("2- VisualTransformer x.shape: {}".format(x.shape))
 
         # shape = [*, width, grid ** 2]
         x = x.reshape(x.shape[0], x.shape[1], -1)
+        # logger.info("3- VisualTransformer x.shape: {}".format(x.shape))
+
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
+        # logger.info("4- VisualTransformer x.shape: {}".format(x.shape))
 
         x = torch.cat(
             [
@@ -483,10 +508,16 @@ class VisualTransformer(nn.Module):
             dim=1,
         )  # shape = [*, grid ** 2 + 1, width]
 
+        # logger.info("5- VisualTransformer x.shape: {}".format(x.shape))
+
         x = x + self.positional_embedding.to(x.dtype)
         x = self.ln_pre(x)
 
+        # logger.info("6- VisualTransformer x.shape: {}".format(x.shape))
+
         x = x.permute(1, 0, 2)  # NLD -> LND
+
+        # logger.info("7- VisualTransformer x.shape: {}".format(x.shape))
 
         if visualize is True:
             all_attn_weights = []
@@ -502,10 +533,29 @@ class VisualTransformer(nn.Module):
         else:
             for i in range(self.intra_layers):
                 x = self.transformer.resblocks[i]((x, video_frame))[0]
+                # logger.info(f"{i+8}- VisualTransformer x.shape: {x.shape}")
+
+
+        #* cut out from here
+        if rsformer:
+            # logger.info("<-------------------------------- R S F O R M E R -------------------------------->")
+            # convert shape of x from [50, 2, 768] to [2, 50, 768] for RSformer
+            x = x.permute(1, 0, 2)
+            
+            # remove the last layer concatenated with zeros 
+            x = x[:, :-1, :]
+
+            # convert shape of x from [2, 49, 768] to [2,7,7, 768] for RSformer
+            x = x.view(x.shape[0], 7, 7, x.shape[2])
+
+            return x
+            
         x = x.permute(1, 0, 2)  # LND -> NLD
+        # logger.info("AFTER FOR 1- VisualTransformer x.shape: {}".format(x.shape))
 
         bs = x.size(0) // video_frame
         x = x.view(bs, video_frame, x.size(-2), x.size(-1))
+        # logger.info("AFTER FOR 2- VisualTransformer x.shape: {}".format(x.shape))
         x = torch.cat(
             [
                 x[:, 0] + self.bef_embedding.to(x.dtype),
@@ -514,10 +564,16 @@ class VisualTransformer(nn.Module):
             dim=1,
         )
 
+        # logger.info("AFTER FOR 3- VisualTransformer x.shape: {}".format(x.shape))
+
         x = x + self.joint_positional_embedding.to(x.dtype)
         x = self.ln_mid(x)
 
+        # logger.info("AFTER FOR 4- VisualTransformer x.shape: {}".format(x.shape))
+
         x = x.permute(1, 0, 2)  # NLD -> LND
+
+        # logger.info("AFTER FOR 5- VisualTransformer x.shape: {}".format(x.shape))
 
         if visualize is True:
             for i in range(self.intra_layers, self.transformer.layers):
@@ -526,7 +582,9 @@ class VisualTransformer(nn.Module):
         else:
             for i in range(self.intra_layers, self.transformer.layers):
                 x = self.transformer.resblocks[i]((x, video_frame))[0]
+                # logger.info(f"{6+i} AFTER FOR- VisualTransformer x.shape: {x.shape}")
         x = x.permute(1, 0, 2)  # LND -> NLD
+        # logger.info("AFTER FOR2.1 - VisualTransformer x.shape: {}".format(x.shape))
 
         # Move the three lines below to `encode_image` for
         # entire hidden sequence
@@ -575,6 +633,8 @@ class CLIP(nn.Module):
         intra_layers: int = 9,
     ):
         super().__init__()
+        # global logger
+        # logger = get_logger("DimensionLog.txt")
 
         self.context_length = context_length
 
@@ -709,29 +769,51 @@ class CLIP(nn.Module):
     @property
     def dtype(self):
         return self.visual.conv1.weight.dtype
+    
+    def encode_image_and_semantic_map_rsformer(self,image_pair,semantic_pair,video_frame=-1,rsformer=True):
+        # global logger 
+        image_outputs = self.visual(image_pair.type(self.dtype),video_frame=video_frame,rsformer=rsformer)
 
+        semantic_outputs = self.semantic_v(semantic_pair.type(self.dtype), video_frame=video_frame,rsformer=rsformer)
+
+        return image_outputs, semantic_outputs
+    
     def encode_image_and_semantic_map(self, image_pair, semantic_pair, return_hidden=False, video_frame=-1):
+        # global logger
         image_hidden = self.visual(image_pair.type(self.dtype), video_frame=video_frame)
         image_features_pooled = self.visual.ln_post(image_hidden) @ self.visual.proj
 
+        # logger.info(f"self.visual.ln_post shape: {self.visual.ln_post(image_hidden).shape}")
+        # logger.info(f"self.visual.proj shape: {self.visual.proj.shape}")
+
         semantic_hidden = self.semantic_v(semantic_pair.type(self.dtype), video_frame=video_frame)
         semantic_features_pooled = self.semantic_v.ln_post(semantic_hidden) @ self.semantic_v.proj
+
+        # logger.info("image_features_pooled.shape: {}".format(image_features_pooled.shape))
+        # logger.info("semantic_features_pooled.shape: {}".format(semantic_features_pooled.shape))
 
         # Basitce karsilikli indisleri toplayalim
         # FIXME:
         # combined_visual_features = image_features_pooled + semantic_features_pooled
         combined_visual_features = self.visual_fusion(image_features_pooled, semantic_features_pooled)
 
+        # logger.info("combined_visual_features.shape: {}".format(combined_visual_features.shape))
+
         x = torch.cat(
             [combined_visual_features[:, 0, :].unsqueeze(1), combined_visual_features[:, 50, :].unsqueeze(1)], 1
         )
+
+        # logger.info("x.shape: {}".format(x.shape))
+
         x = torch.mean(x, 1)
         # x = hidden[:, 0, :]
 
+        # logger.info("x.shape: {}".format(x.shape))
         if return_hidden:
             return x, combined_visual_features
 
         return x
+
 
     def encode_text(self, text, return_hidden=False):
         x = self.token_embedding(text).type(

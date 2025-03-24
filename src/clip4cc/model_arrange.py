@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from clip4cc.data_loader import Clip4CCDataLoader
 
 from .file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from clip4cc.modeling import CLIP4IDC
+from .modeling import CLIP4IDC
 
 
 def get_model_args():
@@ -57,6 +57,33 @@ def get_model_args():
         linear_patch="2d",
     )
 
+
+def encode_images_for_rsformer(
+    model: CLIP4IDC,
+    before_image: Image | Path,
+    after_image: Image | Path,
+    before_semantic_image: Image | Path,
+    after_semantic_image: Image | Path,
+    device: torch.device,
+) -> torch.Tensor:
+    dataset = Clip4CCDataLoader(
+        bef_img_path=before_image,
+        aft_img_path=after_image, 
+        bef_sem_img_path=before_semantic_image, 
+        aft_sem_img_path=after_semantic_image,
+    )
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+    with torch.no_grad():
+        batch = tuple(t.to(device) for t in next(iter(dataloader)))
+        (bef_image, aft_image, bef_sem_image, aft_sem_image, image_mask) = batch
+
+        image_pair = torch.cat([bef_image, aft_image], 1)
+        sem_pair = torch.cat([bef_sem_image, aft_sem_image], 1)
+
+        visual_output, semantic_output = model.get_visual_output_for_rsformer(image_pair, sem_pair, image_mask,rsformer=True)
+        
+    return visual_output, semantic_output
 
 def visual_vector_embedding_dim(model_file: str) -> torch.Size:
     if not os.path.exists(model_file):

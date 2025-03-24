@@ -183,6 +183,14 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
             self._stage_two = True
 
         show_log(task_config, "Stage-One:{}, Stage-Two:{}".format(self._stage_one, self._stage_two))
+        for i in range(1, 5):
+            logger.info(" | ")
+
+        for key in clip_state_dict.keys():
+            logger.info(f"{key} : {clip_state_dict[key].shape}")
+
+        for i in range(1, 5):
+            logger.info(" | ")
 
         # CLIP Encoders: From OpenAI: CLIP [https://github.com/openai/CLIP] ===>
         vit = "visual.proj" in clip_state_dict
@@ -363,6 +371,26 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
         sequence_hidden = sequence_hidden.view(bs_pair, -1, sequence_hidden.size(-1))
 
         return sequence_output, sequence_hidden
+    
+    def get_visual_output_for_rsformer(self,image_pair, semantic_pair, visual_mask, shaped=False,video_frame=-1,rsformer=True,):
+        if shaped is False:
+            visual_mask = visual_mask.view(-1, visual_mask.shape[-1])
+            image_pair = torch.as_tensor(image_pair).float()
+            b, pair, channel, h, w = image_pair.shape
+            image_pair = image_pair.view(b * pair, channel, h, w)
+            video_frame = pair
+
+            semantic_pair = torch.as_tensor(semantic_pair).float()
+            b, pair, channel, h, w = semantic_pair.shape
+            semantic_pair = semantic_pair.view(b * pair, channel, h, w)
+
+        bs_pair = visual_mask.size(0)
+
+        visual_output, semantic_output = self.clip.encode_image_and_semantic_map_rsformer( 
+            image_pair, semantic_pair, video_frame=video_frame, rsformer=rsformer,)
+
+        return visual_output, semantic_output
+
 
     def get_visual_output(self, image_pair, semantic_pair, visual_mask, shaped=False, video_frame=-1):
         if shaped is False:
