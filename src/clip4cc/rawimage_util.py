@@ -1,9 +1,11 @@
 from pathlib import Path
 
+import torch
+import torchvision.transforms.functional as F
 import numpy as np
 from PIL import Image
 from torchvision.transforms import Compose, Normalize, Resize, ToTensor
-
+import numpy as np
 # pytorch=1.7.1
 # pip install opencv-python
 
@@ -41,10 +43,17 @@ class RawImageExtractorCV2:
             # PIL Image işlemleri yapılabilir
             return self.get_image_data(data)
         # Eğer veri bir dosya yoluysa
+        
         elif isinstance(data, (str, Path)):
             # Dosyayı yükleyin
             return self.get_image_data_path(data)
+        elif isinstance(data, torch.Tensor):  # Eğer Tensor ise
+            return self.get_image_data_tensor(data)
         else:
+            print("*"*25)
+            print(type(data))
+            print(data.shape)
+            print("*"*25)
             raise ValueError("Geçersiz veri tipi")
 
     def get_image_data_path(self, image_path):
@@ -56,6 +65,14 @@ class RawImageExtractorCV2:
         image_loaded = self.transform(image_loaded)
 
         return {"image": image_loaded}
+    
+    def get_image_data_tensor(self, tensor):
+        numpy_img = (tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+
+        image = Image.fromarray(numpy_img)
+
+        # PIL görüntüsüne çevir
+        return self.get_image_data(image)
 
     def process_raw_data(self, raw_video_data):
         tensor_size = raw_video_data.size()
