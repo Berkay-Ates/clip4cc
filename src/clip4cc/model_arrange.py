@@ -98,6 +98,31 @@ def encode_rgb_images_for_rsformer(
     )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
+    batch = tuple(t.to(device) for t in next(iter(dataloader)))
+    (bef_image, aft_image, bef_sem_image, aft_sem_image, image_mask) = batch
+
+    image_pair = torch.cat([bef_image, aft_image], 1)
+    sem_pair = torch.cat([bef_sem_image, aft_sem_image], 1)
+
+    visual_output, semantic_output = model.get_visual_output_for_rsformer(image_pair,sem_pair, image_mask,rsformer=True)
+        
+    return visual_output
+
+
+def encode_rgb_images_for_rsformer_no_grad(
+    model: CLIP4IDC,
+    before_image: Image | Path,
+    after_image: Image | Path,
+    device: torch.device,
+) -> torch.Tensor:
+    dataset = Clip4CCDataLoader(
+        bef_img_path=before_image,
+        aft_img_path=after_image, 
+        bef_sem_img_path=before_image, 
+        aft_sem_img_path=after_image,
+    )
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
     with torch.no_grad():
         batch = tuple(t.to(device) for t in next(iter(dataloader)))
         (bef_image, aft_image, bef_sem_image, aft_sem_image, image_mask) = batch
@@ -106,8 +131,9 @@ def encode_rgb_images_for_rsformer(
         sem_pair = torch.cat([bef_sem_image, aft_sem_image], 1)
 
         visual_output, semantic_output = model.get_visual_output_for_rsformer(image_pair,sem_pair, image_mask,rsformer=True)
-        
+            
     return visual_output
+
 
 
 def encode_images_for_rsformer(
